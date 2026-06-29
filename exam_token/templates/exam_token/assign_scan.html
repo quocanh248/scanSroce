@@ -1,0 +1,527 @@
+{% extends 'exam_token/base.html' %} {% block title %}Gán QR{% endblock %} 
+{% block content %}
+<div class="mb-5 rounded-2xl bg-white p-5 shadow-soft">
+  <div
+    class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
+  >
+    <div>
+      <h1 class="text-2xl font-black">Gán bài thi theo QR</h1>
+      <p class="mt-1 text-sm text-slate-500">
+        {{ pt.ma_phien_thi }} · {{ pt.mon.ten_mon }} · {{ pt.lop.ten_lop }} ·
+        Phòng {{ pt.phong_thi }}
+      </p>
+      <div class="mt-2 flex flex-wrap gap-2 text-xs font-bold">
+        <span class="rounded-full bg-blue-50 px-3 py-1 text-blue-700"
+          >{{ pt.get_trang_thai_display }}</span
+        ><span class="rounded-full bg-slate-100 px-3 py-1"
+          >{{ pt.thoi_gian_lam_bai }} phút</span
+        ><span class="rounded-full bg-slate-100 px-3 py-1"
+          >CB1: {{ pt.can_bo_coi_thi_1|default:'-' }}</span
+        ><span class="rounded-full bg-slate-100 px-3 py-1"
+          >CB2: {{ pt.can_bo_coi_thi_2|default:'-' }}</span
+        >
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a
+        target="_blank"
+        href="{{ ghep_url }}"
+        class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-800 hover:bg-blue-100"
+        >Thi ghép</a
+      >
+      <a
+        target="_blank"
+        href="{% url 'bien_ban_thi_pdf' pt.id %}"
+        class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+        >In biên bản PDF</a
+      >
+      <!-- <a
+        href="{% url 'dashboard' %}"
+        class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold"
+        >Dashboard</a
+      > -->
+      <a
+        href="{% url 'session_logs' pt.id %}"
+        class="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-700 hover:bg-orange-100"
+      >
+        log
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="grid gap-5 xl:grid-cols-[390px_1fr]">
+  <section class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
+      <div class="text-xs font-black uppercase tracking-wide text-blue-700">
+        Thời gian làm bài
+      </div>
+      <div
+        id="countdown"
+        data-seconds="{{ seconds_left }}"
+        class="mt-2 text-4xl font-black text-blue-900"
+      >
+        --:--
+      </div>
+      <p class="mt-1 text-xs text-blue-700">
+        Hết giờ hệ thống tự thu bài, khóa nhập liệu và yêu cầu cán bộ xác nhận.
+      </p>
+    </div>
+
+    {% if is_finished %}
+    <div class="rounded-xl bg-slate-100 p-4 text-sm font-bold text-slate-600">
+      Phiên thi đã hoàn thành. Toàn bộ chức năng đã khóa.
+    </div>
+    {% elif is_collected %}
+    <div class="rounded-xl bg-amber-50 p-4 text-sm font-bold text-amber-700">
+      Đã thu bài. Chỉ còn cho phép hủy bài và in biên bản.
+    </div>
+    {% else %}
+    <form id="assignForm" method="post" class="space-y-4">
+      {% csrf_token %}<input type="hidden" name="action" value="assign" />
+      <label class="block text-sm font-bold"
+        >QR bài thi
+        <input
+          id="tokenInput"
+          name="token"
+          autocomplete="off"
+          autofocus
+          placeholder="Quét QR rồi Enter"
+          class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </label>
+      <label class="block text-sm font-bold"
+        >Số báo danh
+        <input
+          id="sbdInput"
+          name="so_bao_danh"
+          autocomplete="off"
+          placeholder="Nhập SBD rồi Enter"
+          class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-xl font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+      </label>
+      <button
+        class="w-full rounded-xl bg-blue-800 px-4 py-3 font-black text-white hover:bg-blue-900"
+      >
+        Kiểm tra và gán QR
+      </button>
+    </form>
+    {% endif %}
+
+    <div class="mt-5 space-y-3">
+      <form
+        method="post"
+        onsubmit="
+          return confirm(
+            'Tính giờ làm bài và khóa phát bài cho thí sinh chưa nhận bài?',
+          );
+        "
+      >
+        {% csrf_token %}<input
+          type="hidden"
+          name="action"
+          value="lock_time"
+        /><button
+          {% if is_finished or is_time_locked %}disabled{% endif %}
+          class="w-full rounded-xl bg-amber-500 px-4 py-3 font-bold text-white hover:bg-amber-600 disabled:bg-slate-300"
+        >
+          Tính giờ làm bài
+        </button>
+      </form>
+      <button
+        id="openCancelByQrBtn"
+        {% if is_finished %}disabled{% endif %}
+        class="w-full rounded-xl bg-red-600 px-4 py-3 font-bold text-white hover:bg-red-700 disabled:bg-slate-300"
+      >
+        Hủy bài thi bằng QR
+      </button>
+      <form method="post" onsubmit="return confirm('Xác nhận thu bài?');">
+        {% csrf_token %}<input
+          type="hidden"
+          name="action"
+          value="collect_papers"
+        /><button
+          {% if is_finished %}disabled{% endif %}
+          class="w-full rounded-xl bg-indigo-700 px-4 py-3 font-bold text-white hover:bg-indigo-800 disabled:bg-slate-300"
+        >
+          Thu bài
+        </button>
+      </form>
+      <button
+        id="openCollectModalBtn"
+        class="w-full rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 font-bold text-indigo-700 hover:bg-indigo-100"
+      >
+        Xem danh sách thu bài
+      </button>
+      <form
+        method="post"
+        onsubmit="
+          return confirm(
+            'Hoàn thành phiên thi, khóa toàn bộ chức năng và đăng xuất?',
+          );
+        "
+      >
+        {% csrf_token %}<input
+          type="hidden"
+          name="action"
+          value="finish_session"
+        /><button
+          {% if is_finished %}disabled{% endif %}
+          class="w-full rounded-xl bg-slate-900 px-4 py-3 font-bold text-white hover:bg-black"
+        >
+          Hoàn thành việc coi thi
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <section class="overflow-hidden rounded-2xl bg-white shadow-soft">
+    <div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="font-black">Danh sách đã phát bài</h2>
+      <p class="text-sm text-slate-500">
+        Đã gán {{ total_assigned_students }} thí sinh · {{ total_active_sheets }} tờ hiệu lực, không tính tờ hủy.
+      </p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead
+          class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"
+        >
+          <tr>
+            <th class="px-5 py-3">SBD</th>
+            <th class="px-5 py-3">Học viên</th>
+            <th class="px-5 py-3">Số tờ</th>
+            <th class="px-5 py-3">Các tờ</th>
+            <th class="px-5 py-3 text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for g in grouped_rows %}
+          <tr class="hover:bg-blue-50/40">
+            <td class="px-5 py-4 text-lg font-black">{{ g.sbd }}</td>
+            <td class="px-5 py-4">
+              <div class="font-bold">{{ g.ho_ten }}</div>
+              <div class="text-xs text-slate-500">{{ g.ma_hoc_vien }}</div>
+            </td>
+            <td class="px-5 py-4 font-black text-blue-700">
+              {{ g.tong_so_to }}
+            </td>
+            <td class="px-5 py-4">
+              {% for n in g.so_to_list %}<span
+                class="mr-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-bold"
+                >Tờ {{ n }}</span
+              >{% endfor %}
+            </td>
+            <td class="px-5 py-4 text-right">
+              {% if not is_time_locked and not is_collected and not is_finished %}
+              <button
+                type="button"
+                class="editBtn rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700"
+                data-id="{{ g.tokens.0.id }}"
+                data-sbd="{{ g.sbd }}"
+                data-name="{{ g.ho_ten }}"
+              >
+                Sửa SBD</button
+              >{% else %}<span class="text-xs text-slate-400">Đã khóa</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="px-5 py-10 text-center text-slate-500">
+              Chưa có thí sinh nào được phát bài.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div
+  id="cancelModal"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 p-4"
+>
+  <div class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+    <h3 class="text-xl font-black text-red-700">Hủy bài thi bằng QR</h3>
+
+    <form id="cancelForm" method="post" class="mt-4 space-y-4">
+      {% csrf_token %}
+
+      <input type="hidden" name="action" value="cancel_by_token" />
+
+      <label class="block">
+        <span class="mb-1 block text-sm font-bold text-slate-700">
+          QR bài thi cần hủy
+        </span>
+        <input
+          id="cancelTokenInput"
+          name="cancel_token"
+          placeholder="Quét QR cần hủy"
+          autocomplete="off"
+          class="w-full rounded-xl border border-slate-300 px-4 py-3 font-mono outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+        />
+      </label>
+
+      <div
+        id="cancelFoundBox"
+        class="hidden rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700"
+      ></div>
+
+      <div
+        id="cancelNotFoundBox"
+        class="hidden rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700"
+      ></div>
+
+      <label class="block">
+        <span class="mb-1 block text-sm font-bold text-slate-700">
+          Lý do hủy
+        </span>
+        <select
+          id="cancelReasonSelect"
+          name="cancel_reason"
+          class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+          required
+        >
+          <option value="Rách giấy">Rách giấy</option>
+          <option value="Khác">Khác</option>
+        </select>
+      </label>
+
+      <label id="cancelReasonOtherBox" class="hidden block">
+        <span class="mb-1 block text-sm font-bold text-slate-700">
+          Ghi rõ lý do khác
+        </span>
+        <input
+          id="cancelReasonOtherInput"
+          name="cancel_reason_other"
+          placeholder="Nhập lý do hủy khác"
+          autocomplete="off"
+          class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+        />
+      </label>
+
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          class="closeModal rounded-lg border px-4 py-2 font-bold"
+        >
+          Đóng
+        </button>
+
+        <button
+          id="confirmCancelByQrBtn"
+          disabled
+          type="button"
+          class="rounded-lg bg-red-600 px-4 py-2 font-bold text-white disabled:bg-slate-300"
+        >
+          Xác nhận hủy
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<div
+  id="collectModal"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 p-4"
+>
+  <div class="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl">
+    <div class="mb-4 flex justify-between">
+      <h3 class="text-xl font-black">Danh sách thu bài</h3>
+      <button class="closeModal rounded-lg border px-4 py-2 font-bold">
+        Đóng
+      </button>
+    </div>
+    <div class="max-h-[70vh] overflow-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-left">
+          <tr>
+            <th class="px-4 py-3">SBD</th>
+            <th class="px-4 py-3">Họ tên</th>
+            <th class="px-4 py-3">Mã HV</th>
+            <th class="px-4 py-3">Tổng số tờ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in collect_rows %}
+          <tr class="border-t">
+            <td class="px-4 py-3 font-bold">{{ g.sbd }}</td>
+            <td class="px-4 py-3">{{ g.ho_ten }}</td>
+            <td class="px-4 py-3">{{ g.ma_hoc_vien }}</td>
+            <td class="px-4 py-3 font-black text-blue-700">
+              {{ g.tong_so_to }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div
+  id="editModal"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 p-4"
+>
+  <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+    <h3 class="text-xl font-black">Sửa SBD</h3>
+    <p id="editInfo" class="mt-1 text-sm text-slate-500"></p>
+    <form method="post" class="mt-4 space-y-4">
+      {% csrf_token %}<input
+        type="hidden"
+        name="action"
+        value="edit_sbd"
+      /><input id="editAssignmentId" type="hidden" name="assignment_id" /><input
+        id="editTokenInput"
+        name="edit_token"
+        placeholder="Quét lại QR"
+        class="w-full rounded-xl border px-4 py-3 font-mono"
+      /><input
+        id="editSbdInput"
+        name="edit_so_bao_danh"
+        placeholder="SBD mới"
+        class="w-full rounded-xl border px-4 py-3 text-xl font-black"
+      />
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          class="closeModal rounded-lg border px-4 py-2 font-bold"
+        >
+          Đóng</button
+        ><button class="rounded-lg bg-blue-800 px-4 py-2 font-bold text-white">
+          Lưu
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{{ cancel_payload|json_script:'cancelPayload' }}
+<script>
+  (function () {
+    const tokenInput = document.getElementById("tokenInput"),
+      sbdInput = document.getElementById("sbdInput"),
+      assignForm = document.getElementById("assignForm");
+    tokenInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (tokenInput.value.trim()) {
+          sbdInput.focus();
+          sbdInput.select();
+        }
+      }
+    });
+    sbdInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (tokenInput.value.trim() && sbdInput.value.trim())
+          assignForm.submit();
+      }
+    });
+    const cd = document.getElementById("countdown");
+    let sec = parseInt(cd?.dataset.seconds || "0");
+    function tick() {
+      if (!cd) return;
+      if (sec <= 0) {
+        cd.textContent = "00:00";
+        return;
+      }
+      let h = Math.floor(sec / 3600),
+        m = Math.floor((sec % 3600) / 60),
+        s = sec % 60;
+      cd.textContent =
+        (h ? String(h).padStart(2, "0") + ":" : "") +
+        String(m).padStart(2, "0") +
+        ":" +
+        String(s).padStart(2, "0");
+      sec--;
+    }
+    tick();
+    setInterval(tick, 1000);
+    const cancelModal = document.getElementById("cancelModal"),
+      collectModal = document.getElementById("collectModal"),
+      editModal = document.getElementById("editModal");
+    function open(el) {
+      el?.classList.remove("hidden");
+      el?.classList.add("flex");
+    }
+    function closeAll() {
+      [cancelModal, collectModal, editModal].forEach((el) => {
+        el?.classList.add("hidden");
+        el?.classList.remove("flex");
+      });
+    }
+    document
+      .querySelectorAll(".closeModal")
+      .forEach((b) => b.addEventListener("click", closeAll));
+    document
+      .getElementById("openCollectModalBtn")
+      ?.addEventListener("click", () => open(collectModal));
+    document.getElementById("openCancelByQrBtn") ?.addEventListener("click", () => {
+        open(cancelModal);
+        cancelTokenInput.focus();
+      });
+    document.querySelectorAll(".editBtn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        document.getElementById("editAssignmentId").value = btn.dataset.id;
+        document.getElementById("editSbdInput").value = btn.dataset.sbd;
+        document.getElementById("editInfo").textContent =
+          `${btn.dataset.name} · SBD hiện tại ${btn.dataset.sbd}`;
+        open(editModal);
+      }),
+    );
+    const payload = JSON.parse(
+        document.getElementById("cancelPayload")?.textContent || "[]",
+      ),
+      inp = document.getElementById("cancelTokenInput"),
+      foundBox = document.getElementById("cancelFoundBox"),
+      notBox = document.getElementById("cancelNotFoundBox"),
+      confirmBtn = document.getElementById("confirmCancelByQrBtn");
+    function lookup() {
+      const f = payload.find(
+        (x) => String(x.token).trim() === String(inp.value).trim(),
+      );
+      if (f) {
+        foundBox.classList.remove("hidden");
+        foundBox.textContent = `Tìm thấy: ${f.ho_ten} · SBD ${f.sbd} · tờ ${f.so_to}`;
+        notBox.classList.add("hidden");
+        confirmBtn.disabled = false;
+      } else {
+        foundBox.classList.add("hidden");
+        notBox.classList.remove("hidden");
+        notBox.textContent = "Không tìm thấy QR hiệu lực trong phiên này.";
+        confirmBtn.disabled = true;
+      }
+    }
+    inp?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        lookup();
+      }
+    });
+    inp?.addEventListener("input", () => (confirmBtn.disabled = true));
+    const cancelForm = document.getElementById("cancelForm");
+
+    confirmBtn?.addEventListener("click", function () {
+      const qrValue = inp?.value?.trim() || "";
+      const foundText = foundBox?.textContent || "";
+
+      if (!qrValue) {
+        alert("Vui lòng quét hoặc nhập QR cần hủy.");
+        return;
+      }
+
+      const ok = window.confirm(
+        "Bạn có chắc chắn muốn HỦY bài thi này không?\n\n" +
+        foundText +
+        "\n\nThao tác này sẽ ghi log và không nên thực hiện nếu chưa kiểm tra kỹ."
+      );
+
+      if (!ok) {
+        return;
+      }
+
+      cancelForm?.submit();
+    });
+  })();
+</script>
+{% endblock %}

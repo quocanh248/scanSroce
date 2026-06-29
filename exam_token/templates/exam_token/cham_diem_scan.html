@@ -1,0 +1,137 @@
+{% extends 'exam_token/base.html' %}
+{% load static %}
+{% block title %}Chấm điểm {{ role_title }}{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="rounded-2xl bg-white p-6 shadow-soft">
+    <h1 class="text-2xl font-black text-slate-900">Chấm điểm {{ role_title }}</h1>
+    <p class="mt-1 text-sm text-slate-500">Quét QR link đầy đủ. Màn hình này không hiển thị thông tin thí sinh.</p>
+
+    <form method="post" class="mt-5 flex gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="scan">
+      <input id="qrInput" name="qr_link" value="{{ qr_link|default:'' }}" autofocus autocomplete="off" placeholder="Quét QR link đầy đủ..." class="flex-1 rounded-xl border border-slate-300 px-4 py-3 font-mono outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100">
+      <button class="rounded-xl bg-blue-800 px-5 py-3 font-black text-white hover:bg-blue-900">Kiểm tra</button>
+    </form>
+  </div>
+
+  {% if bai_cham %}
+  <div class="grid gap-6 xl:grid-cols-[360px_1fr]">
+    <div class="rounded-2xl bg-white p-6 shadow-soft">
+      <h2 class="font-black text-slate-900">Thông tin bài thi</h2>
+      <div class="mt-4 space-y-3 text-sm">
+        <div><span class="text-slate-500">Kỳ thi:</span> <b>{{ bai_cham.phien_thi.ten_ky_thi|default:'-' }}</b></div>
+        <div><span class="text-slate-500">Lớp:</span> <b>{{ bai_cham.phien_thi.lop|default:'-' }}</b></div>
+        <div><span class="text-slate-500">Môn học:</span> <b>{{ bai_cham.phien_thi.mon|default:'-' }}</b></div>
+        <div><span class="text-slate-500">Ngày thi:</span> <b>{{ bai_cham.phien_thi.ngay_thi|date:'d/m/Y' }}</b></div>
+        <div><span class="text-slate-500">Phòng thi:</span> <b>{{ bai_cham.phien_thi.phong_thi|default:'-' }}</b></div>
+        <div><span class="text-slate-500">Trạng thái chấm:</span> <b>{{ bai_cham.get_trang_thai_display }}</b></div>
+      </div>
+      <div class="mt-5 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700">Không hiển thị họ tên, MSHV/SBD thí sinh khi chấm điểm.</div>
+    </div>
+
+    <form method="post" class="rounded-2xl bg-white p-6 shadow-soft">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="submit_score">
+      <input type="hidden" name="qr_link" value="{{ qr_link }}">
+      <h2 class="font-black text-slate-900">Phiếu điểm lượt {{ lan_cham }}</h2>
+      <table class="mt-4 min-w-full overflow-hidden rounded-xl border text-sm">
+        <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <tr><th class="px-4 py-3">Câu</th><th class="px-4 py-3">Nhập điểm</th><th class="px-4 py-3">Hiểu là</th><th class="px-4 py-3 text-right">Thao tác</th></tr>
+        </thead>
+        <tbody id="scoreRows">
+          {% for i in '12' %}
+          <tr class="border-t">
+            <td class="px-4 py-3 font-bold"><span class="cau-label">Câu {{ forloop.counter }}</span><input type="hidden" name="cau_so[]" value="{{ forloop.counter }}"></td>
+            <td class="px-4 py-3"><input name="diem[]" autocomplete="off" class="score-input w-full rounded-xl border border-slate-300 px-4 py-3 text-center font-bold" placeholder="VD: 35 = 3.5"></td>
+            <td class="px-4 py-3 font-mono score-preview">0.00</td>
+            <td class="px-4 py-3 text-right"><button type="button" class="remove-score-row rounded-lg border px-3 py-2 text-sm font-bold">Xóa</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="mt-4 flex items-center justify-between">
+        <button id="addScoreRowBtn" type="button" class="rounded-xl border border-slate-300 px-4 py-2 font-bold">+ Thêm câu</button>
+        <div class="text-lg font-black">Tổng điểm: <span id="scoreTotal" class="font-mono text-blue-800">0.00</span> / 10</div>
+      </div>
+      <label class="mt-4 block text-sm font-bold">Ghi chú
+        <textarea name="ghi_chu" rows="3" class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3"></textarea>
+      </label>
+      <button type="submit" class="mt-5 w-full rounded-xl bg-emerald-700 px-4 py-3 font-black text-white hover:bg-emerald-800">Nộp phiếu chấm</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+<script src="{% static 'exam_token/js/smart_score.js' %}"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const qrInput = document.querySelector("#qrInput, input[name='qr_link'], input[name='qr_code']");
+    const scoreInputs = Array.from(document.querySelectorAll(".score-input, input[name='diem[]'], input[name='scores[]']"));
+    const form = document.querySelector("#scoreForm, form");
+
+    // Sau khi trang load lại sau khi quét QR, tự clear ô QR và focus vào điểm câu 1
+    if (qrInput) {
+      qrInput.value = "";
+    }
+
+    const firstScoreInput = scoreInputs.find(function (el) {
+      return !el.disabled && !el.readOnly;
+    });
+
+    if (firstScoreInput) {
+      setTimeout(function () {
+        firstScoreInput.focus();
+        firstScoreInput.select();
+      }, 150);
+    } else if (qrInput) {
+      setTimeout(function () {
+        qrInput.focus();
+      }, 150);
+    }
+
+    // Bấm Enter ở ô điểm thì chuyển xuống câu tiếp theo, không submit form
+    scoreInputs.forEach(function (input, index) {
+      input.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+
+        event.preventDefault();
+
+        const nextInput = scoreInputs[index + 1];
+
+        if (nextInput && !nextInput.disabled && !nextInput.readOnly) {
+          nextInput.focus();
+          nextInput.select();
+          return;
+        }
+
+        // Nếu đang ở ô cuối thì không nộp phiếu, chỉ blur hoặc giữ focus
+        input.blur();
+
+        const addRowBtn = document.querySelector("#addScoreRowBtn, #addRowBtn, [data-add-score-row]");
+        if (addRowBtn) {
+          addRowBtn.focus();
+        }
+      });
+    });
+
+    // Chặn Enter submit form, trừ textarea hoặc nút submit
+    if (form) {
+      form.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+
+        const tag = event.target.tagName.toLowerCase();
+        const type = (event.target.getAttribute("type") || "").toLowerCase();
+
+        if (tag === "textarea") return;
+        if (type === "submit" || type === "button") return;
+
+        if (
+          event.target.matches(".score-input, input[name='diem[]'], input[name='scores[]']")
+        ) {
+          event.preventDefault();
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'exam_token/base.html' %}
+{% block title %}Trưởng hội đồng{% endblock %}
+{% block content %}
+<div class="rounded-2xl bg-white shadow-soft overflow-hidden">
+  <div class="border-b px-5 py-4"><h1 class="text-2xl font-black">Phiếu cần Trưởng hội đồng xác nhận</h1><p class="text-sm text-slate-500">Chỉ hiển thị bài có độ lệch > 1.5.</p></div>
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th class="px-5 py-3">Lớp</th><th class="px-5 py-3">Môn</th><th class="px-5 py-3">Ngày thi</th><th class="px-5 py-3">Độ lệch</th><th class="px-5 py-3">Điểm chính thức</th><th class="px-5 py-3 text-right">Xác nhận</th></tr></thead>
+    <tbody class="divide-y">
+      {% for b in items %}
+      <tr>
+        <td class="px-5 py-4 font-bold">{{ b.phien_thi.lop }}</td>
+        <td class="px-5 py-4">{{ b.phien_thi.mon }}</td>
+        <td class="px-5 py-4">{{ b.phien_thi.ngay_thi|date:'d/m/Y' }}</td>
+        <td class="px-5 py-4 font-mono text-red-700">{{ b.do_lech }}</td>
+        <td class="px-5 py-4" colspan="2">
+          <form method="post" class="flex justify-end gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="bai_cham_id" value="{{ b.id }}">
+            <input name="diem_chinh_thuc" class="w-32 rounded-lg border px-3 py-2 font-mono" placeholder="VD: 75">
+            <input name="ghi_chu" class="w-72 rounded-lg border px-3 py-2" placeholder="Ghi chú">
+            <button class="rounded-lg bg-blue-800 px-4 py-2 font-bold text-white">Xác nhận</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="py-10 text-center text-slate-500">Không có phiếu cần xử lý.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

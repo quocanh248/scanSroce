@@ -1,0 +1,21 @@
+{% extends 'exam_token/base.html' %}
+{% block title %}Tạo phiên thi{% endblock %}
+{% block content %}
+<div class="rounded-2xl bg-white p-6 shadow-soft">
+  <div class="mb-6"><h1 class="text-2xl font-black">Tạo phiên thi</h1><p class="text-sm text-slate-500">Thi ghép sẽ tự điền phòng thi, cán bộ coi thi và ngày thi từ phiên hiện tại.</p></div>
+  <form method="post" class="grid gap-5 md:grid-cols-2">
+    {% csrf_token %}
+    {% for field in form %}
+      <label class="text-sm font-bold text-slate-700 {% if field.name == 'ghi_chu' %}md:col-span-2{% endif %}">{{ field.label }}
+        {{ field }}
+        {% if field.errors %}<div class="mt-1 text-xs text-red-600">{{ field.errors }}</div>{% endif %}
+      </label>
+    {% endfor %}
+    <div class="md:col-span-2 flex gap-3 pt-2">
+      <button name="open_assign" value="1" class="rounded-xl bg-blue-800 px-5 py-3 font-black text-white hover:bg-blue-900">Tạo và sang gán QR</button>
+      <button class="rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50">Tạo phiên thi</button>
+      <a href="{% url 'dashboard' %}" class="rounded-xl border border-slate-300 px-5 py-3 font-bold text-slate-700 hover:bg-slate-50">Quay lại</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends 'exam_token/base.html' %}
+{% block title %}Đối chiếu chấm điểm{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="rounded-2xl bg-white p-6 shadow-soft">
+    <h1 class="text-2xl font-black">Đối chiếu chấm điểm</h1>
+    <p class="mt-1 text-sm text-slate-500">Không hiển thị thông tin thí sinh.</p>
+    <div class="mt-4 grid gap-3 text-sm md:grid-cols-4">
+      <div class="rounded-xl bg-slate-50 p-3"><span class="text-slate-500">Lớp</span><br><b>{{ bai_cham.phien_thi.lop }}</b></div>
+      <div class="rounded-xl bg-slate-50 p-3"><span class="text-slate-500">Môn</span><br><b>{{ bai_cham.phien_thi.mon }}</b></div>
+      <div class="rounded-xl bg-slate-50 p-3"><span class="text-slate-500">Ngày thi</span><br><b>{{ bai_cham.phien_thi.ngay_thi|date:'d/m/Y' }}</b></div>
+      <div class="rounded-xl bg-slate-50 p-3"><span class="text-slate-500">Trạng thái</span><br><b>{{ bai_cham.get_trang_thai_display }}</b></div>
+    </div>
+  </div>
+
+  <div class="grid gap-6 xl:grid-cols-[1fr_320px]">
+    <div class="overflow-hidden rounded-2xl bg-white shadow-soft">
+      <div class="border-b px-5 py-4 font-black">Bảng so sánh 2 phiếu điểm</div>
+      <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div class="rounded-xl border bg-white p-4">
+            <div class="text-sm text-slate-500">Giám khảo 1</div>
+            <div class="font-bold text-slate-900">
+                {{ nguoi_cham_gk1|default:"-" }}
+            </div>
+            <div class="mt-1 text-sm text-slate-600">
+                Tổng điểm: {{ phieu1.tong_diem }}
+            </div>
+        </div>
+
+        <div class="rounded-xl border bg-white p-4">
+            <div class="text-sm text-slate-500">Giám khảo 2</div>
+            <div class="font-bold text-slate-900">
+                {{ nguoi_cham_gk2|default:"-" }}
+            </div>
+            <div class="mt-1 text-sm text-slate-600">
+                Tổng điểm: {{ phieu2.tong_diem }}
+            </div>
+        </div>
+
+        <div class="rounded-xl border bg-white p-4">
+            <div class="text-sm text-slate-500">Phiếu thống nhất</div>
+            <div class="font-bold text-slate-900">
+                {{ nguoi_cham_thong_nhat|default:"Chưa có" }}
+            </div>
+            {% if phieu_thong_nhat %}
+                <div class="mt-1 text-sm text-slate-600">
+                    Tổng điểm: {{ phieu_thong_nhat.tong_diem }}
+                </div>
+            {% endif %}
+        </div>
+      </div>
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <tr><th class="px-5 py-3">Câu</th><th class="px-5 py-3">Điểm GK1</th><th class="px-5 py-3">Điểm GK2</th><th class="px-5 py-3">Lệch câu</th></tr>
+        </thead>
+        <tbody class="divide-y">
+          {% for r in rows %}
+          <tr><td class="px-5 py-4 font-bold">Câu {{ r.cau_so }}</td><td class="px-5 py-4 font-mono">{{ r.diem_gk1|default:'-' }}</td><td class="px-5 py-4 font-mono">{{ r.diem_gk2|default:'-' }}</td><td class="px-5 py-4 font-mono">-</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rounded-2xl bg-white p-6 shadow-soft">
+      <h2 class="font-black">Kết quả tổng</h2>
+      <div class="mt-4 space-y-3 text-sm">
+        <div class="flex justify-between"><span>Điểm GK1</span><b class="font-mono">{{ phieu1.tong_diem }}</b></div>
+        <div class="flex justify-between"><span>Điểm GK2</span><b class="font-mono">{{ phieu2.tong_diem }}</b></div>
+        <div class="flex justify-between border-t pt-3"><span>Độ lệch</span><b class="font-mono text-red-700">{{ do_lech }}</b></div>
+      </div>
+      <form method="post" class="mt-5">
+        {% csrf_token %}
+        <button class="w-full rounded-xl bg-blue-800 px-4 py-3 font-black text-white hover:bg-blue-900">Bấm đối chiếu</button>
+      </form>
+      {% if bai_cham.trang_thai == 'can_cham_thong_nhat' %}
+      <a href="{% url 'cham_diem_thong_nhat' bai_cham.id %}" class="mt-3 block rounded-xl bg-amber-600 px-4 py-3 text-center font-black text-white">Tạo phiếu thống nhất</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

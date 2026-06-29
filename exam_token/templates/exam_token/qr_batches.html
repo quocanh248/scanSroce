@@ -1,0 +1,186 @@
+{% extends 'exam_token/base.html' %}
+{% block title %}Quản lý QR{% endblock %}
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-[440px_1fr]">
+  <form method="post" class="rounded-2xl bg-white p-6 shadow-soft">
+    {% csrf_token %}
+    <div>     
+      <h1 class="mt-1 text-2xl font-black text-blue-700">Tạo đợt in QR</h1>      
+    </div>
+
+    <label class="mt-5 block text-sm font-bold text-slate-700">
+      Mã lô / mã đợt in
+      <input
+        name="ma_dot"
+        placeholder="VD: QR2026-001"
+        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        required
+      >
+    </label>
+
+    <label class="mt-4 block text-sm font-bold text-slate-700">
+      Ngày in
+      <input
+        id="printDateInput"
+        name="ngay_in"
+        type="date"
+        value="{{ today|date:'Y-m-d' }}"
+        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        required
+      >
+      <span class="mt-1 block text-xs font-medium text-slate-500">
+        10 ký tự đầu của public token sẽ là ngày in dạng YYYY-MM-DD.
+      </span>
+    </label>
+
+    <!-- <label class="mt-4 block text-sm font-bold text-slate-700">
+      Nội dung mã đầu tiên
+      <input
+        id="startTextInput"
+        name="noi_dung_bat_dau"
+        placeholder="VD: DHCSND_000001"
+        value="DHCSND_000001"
+        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        required
+      >
+      <span class="mt-1 block text-xs font-medium text-slate-500">
+        Bắt buộc kết thúc bằng số. Hệ thống sẽ tăng dần: DHCSND_000001, DHCSND_000002, ...
+      </span>
+    </label> -->
+
+    <label class="mt-4 block text-sm font-bold text-slate-700">
+      Số lượng
+      <input
+        id="quantityInput"
+        name="so_luong"
+        type="number"
+        min="1"
+        value="100"
+        class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        required
+      >
+    </label>
+
+    <!-- <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+      <div class="font-black">Xem trước dãy mã</div>
+      <div class="mt-2 grid gap-2 font-mono text-xs">
+        <div>Nội dung đầu: <b id="previewFirst">DHCSND_000001</b></div>
+        <div>Nội dung cuối: <b id="previewLast">DHCSND_000100</b></div>
+        <div>Prefix ngày in: <b id="previewDatePrefix">{{ today|date:'Y-m-d' }}</b></div>
+        <div>QR đưa vào ảnh: <b>https://qrdhcsnd.space/q.php?t=&lt;YYYY-MM-DD&gt;&lt;token_ma_hoa&gt;&lt;suffix_10&gt;</b></div>
+      </div>
+    </div> -->
+
+    <!-- <div class="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-5 text-amber-900">
+      <b>Lưu ý:</b> để tạo QR tracking, file <code>.env</code> phải có <code>STUDENT_SECRET_KEY</code>.
+      File Excel xuất ra sẽ có đủ lô in, ngày in, nội dung gốc, token mã hóa, public token và QR link.
+    </div> -->
+
+    <button class="mt-5 w-full rounded-xl bg-blue-800 px-4 py-3 font-black text-white hover:bg-blue-900">
+      Tạo QR
+    </button>
+  </form>
+
+  <div class="overflow-hidden rounded-2xl bg-white shadow-soft">
+    <div class="flex flex-col gap-2 border-b px-5 py-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h2 class="font-black text-slate-950">Danh sách lô QR</h2>
+        <p class="mt-1 text-sm text-slate-500">Mỗi QR lưu link tracking, có thể xuất Excel nội dung QR theo từng lô.</p>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th class="px-5 py-3">Lô in</th>
+            <th class="px-5 py-3">Ngày in</th>
+            <th class="px-5 py-3">Dãy nội dung</th>
+            <th class="px-5 py-3">Số QR</th>
+            <th class="px-5 py-3">Trạng thái</th>
+            <th class="px-5 py-3 text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for b in batches %}
+          <tr class="hover:bg-blue-50/40">
+            <td class="px-5 py-4 font-bold text-slate-900">{{ b.ma_dot }}</td>
+            <td class="px-5 py-4 font-mono text-xs text-slate-700">
+              {{ b.ngay_in|date:'Y-m-d'|default:b.ngay_in_prefix|default:'-' }}
+            </td>
+            <!-- <td class="px-5 py-4">
+              <div class="font-mono text-xs text-slate-700">
+                {{ b.noi_dung_bat_dau|default:'-' }} → {{ b.noi_dung_ket_thuc|default:'-' }}
+              </div>
+            </td> -->
+            <td class="px-5 py-4 font-bold text-blue-700">{{ b.total }}</td>
+            <td class="px-5 py-4">
+              <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+                {{ b.trang_thai }}
+              </span>
+            </td>
+            <td class="px-5 py-4 text-right">
+              <div class="flex justify-end gap-2">
+                <!-- <a
+                  target="_blank"
+                  class="rounded-lg bg-blue-800 px-3 py-2 font-bold text-white hover:bg-blue-900"
+                  href="{% url 'qr_batch_pdf' b.id %}"
+                >
+                  In PDF
+                </a> -->
+                <a
+                  class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-bold text-emerald-700 hover:bg-emerald-100"
+                  href="{% url 'qr_batch_excel' b.id %}"
+                >
+                  Xuất Excel
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="py-10 text-center text-slate-500">Chưa có lô QR.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const startInput = document.getElementById("startTextInput");
+    const quantityInput = document.getElementById("quantityInput");
+    const printDateInput = document.getElementById("printDateInput");
+    const previewFirst = document.getElementById("previewFirst");
+    const previewLast = document.getElementById("previewLast");
+    const previewDatePrefix = document.getElementById("previewDatePrefix");
+
+    function buildLastValue(startText, quantity) {
+      startText = String(startText || "").trim();
+      quantity = parseInt(quantity || "0", 10);
+      const match = startText.match(/^(.*?)(\d+)$/);
+      if (!match || quantity <= 0) return "Không hợp lệ";
+      const prefix = match[1];
+      const numText = match[2];
+      const startNum = parseInt(numText, 10);
+      const width = numText.length;
+      const lastNum = startNum + quantity - 1;
+      return prefix + String(lastNum).padStart(width, "0");
+    }
+
+    function updatePreview() {
+      const first = String(startInput.value || "").trim();
+      previewFirst.textContent = first || "-";
+      previewLast.textContent = buildLastValue(first, quantityInput.value);
+      previewDatePrefix.textContent = printDateInput.value || "YYYY-MM-DD";
+    }
+
+    startInput?.addEventListener("input", updatePreview);
+    quantityInput?.addEventListener("input", updatePreview);
+    printDateInput?.addEventListener("input", updatePreview);
+    updatePreview();
+  })();
+</script>
+{% endblock %}

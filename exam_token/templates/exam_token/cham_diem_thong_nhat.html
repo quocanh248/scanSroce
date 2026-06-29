@@ -1,0 +1,116 @@
+{% extends 'exam_token/base.html' %}
+{% load static %}
+{% block title %}Phiếu chấm thống nhất{% endblock %}
+{% block content %}
+<div class="rounded-2xl bg-white p-6 shadow-soft">
+  <h1 class="text-2xl font-black">Phiếu chấm thống nhất</h1>
+  <p class="mt-1 text-sm text-slate-500">Dùng khi điểm GK1 và GK2 lệch > 0.5 và <= 1.5. Điểm phiếu này sẽ là điểm chính thức.</p>
+  <div class="mt-4 rounded-xl bg-slate-50 p-4 text-sm">
+    <b>{{ bai_cham.phien_thi.lop }}</b> · <b>{{ bai_cham.phien_thi.mon }}</b> · {{ bai_cham.phien_thi.ngay_thi|date:'d/m/Y' }}
+  </div>
+  <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+    <div class="rounded-xl border bg-white p-4">
+        <div class="text-sm text-slate-500">Người chấm GK1</div>
+        <div class="font-bold text-slate-900">
+            {{ nguoi_cham_gk1|default:"-" }}
+        </div>
+        {% if phieu1 %}
+            <div class="mt-1 text-sm text-slate-600">
+                Tổng điểm: {{ phieu1.tong_diem }}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="rounded-xl border bg-white p-4">
+        <div class="text-sm text-slate-500">Người chấm GK2</div>
+        <div class="font-bold text-slate-900">
+            {{ nguoi_cham_gk2|default:"-" }}
+        </div>
+        {% if phieu2 %}
+            <div class="mt-1 text-sm text-slate-600">
+                Tổng điểm: {{ phieu2.tong_diem }}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="rounded-xl border bg-white p-4">
+        <div class="text-sm text-slate-500">Người chấm thống nhất</div>
+        <div class="font-bold text-slate-900">
+            {{ nguoi_cham_hien_tai|default:"-" }}
+        </div>
+    </div>
+  </div>
+  <form id="thongNhatForm" method="post" class="mt-5">
+    {% csrf_token %}
+    <table class="min-w-full rounded-xl border text-sm">
+      <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th class="px-4 py-3">Câu</th><th class="px-4 py-3">Nhập điểm</th><th class="px-4 py-3">Hiểu là</th><th class="px-4 py-3 text-right">Thao tác</th></tr></thead>
+      <tbody id="scoreRows">
+        {% for i in '12' %}
+        <tr class="border-t">
+          <td class="px-4 py-3 font-bold">
+            <span class="cau-label">Câu {{ forloop.counter }}</span>
+            <input type="hidden" name="cau_so[]" value="{{ forloop.counter }}">
+          </td>
+          <td class="px-4 py-3">
+            <input name="diem[]" autocomplete="off" class="score-input w-full rounded-xl border border-slate-300 px-3 py-2 font-mono" placeholder="VD: 35 = 3.5">
+          </td>
+          <td class="px-4 py-3 font-mono score-preview">0.00</td>
+          <td class="px-4 py-3 text-right">
+            <button type="button" class="remove-score-row rounded-lg border px-3 py-2 text-sm font-bold">Xóa</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="mt-4 flex items-center justify-between">
+      <button id="addScoreRow" type="button" class="rounded-xl border border-slate-300 px-4 py-2 font-bold">+ Thêm câu</button>
+      <div class="text-lg font-black">Tổng điểm: <span id="scoreTotal" class="font-mono text-blue-800">0.00</span> / 10</div>
+    </div>
+    <textarea name="ghi_chu" rows="3" placeholder="Ghi chú thống nhất" class="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3"></textarea>
+    <button type="submit" class="mt-5 w-full rounded-xl bg-emerald-700 px-4 py-3 font-black text-white">Lưu phiếu thống nhất</button>
+  </form>
+</div>
+<script src="{% static 'exam_token/js/smart_score.js' %}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("thongNhatForm");
+
+    if (!form) return;
+
+    function getScoreInputs() {
+        return Array.from(
+            form.querySelectorAll(".score-input, input[name='diem[]']")
+        ).filter(function (el) {
+            return !el.disabled && !el.readOnly;
+        });
+    }
+
+    form.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+
+        const target = event.target;
+
+        if (!target.matches(".score-input, input[name='diem[]']")) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const inputs = getScoreInputs();
+        const currentIndex = inputs.indexOf(target);
+        const nextInput = inputs[currentIndex + 1];
+
+        if (nextInput) {
+            nextInput.focus();
+            nextInput.select();
+        } else {
+            target.blur();
+
+            const submitButton = form.querySelector("button[type='submit']");
+            if (submitButton) {
+                submitButton.focus();
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

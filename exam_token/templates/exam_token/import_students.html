@@ -1,0 +1,15 @@
+{% extends 'exam_token/base.html' %}
+{% block title %}Import thí sinh{% endblock %}
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-3">
+  <form method="post" enctype="multipart/form-data" class="xl:col-span-2 rounded-2xl bg-white p-6 shadow-soft">
+    {% csrf_token %}
+    <h1 class="text-2xl font-black">Import thí sinh</h1>
+    <p class="mt-1 text-sm text-slate-500">Hỗ trợ Excel/CSV, cột: ma_hoc_vien, ho_ten, so_bao_danh, ngay_sinh, gioi_tinh, ma_lop, ten_lop.</p>
+    <input type="file" name="file" class="mt-6 w-full rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-blue-800 file:px-4 file:py-2 file:font-bold file:text-white">
+    <label class="mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold"><input type="checkbox" name="overwrite" checked class="h-5 w-5"> Cập nhật nếu học viên đã tồn tại</label>
+    <button class="mt-5 rounded-xl bg-blue-800 px-5 py-3 font-black text-white hover:bg-blue-900">Import dữ liệu</button>
+  </form>
+  <div class="rounded-2xl bg-blue-50 p-6 text-sm text-blue-900 shadow-soft"><h3 class="font-black">Ghi chú</h3><p class="mt-2">Số báo danh dùng để gán QR trong đúng lớp của phiên thi.</p></div>
+</div>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends 'exam_token/base.html' %} {% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-black text-slate-950">Dashboard</h1>
+    <p class="text-sm text-slate-500">
+      Theo dõi phiên thi và trạng thái QR bài thi.
+    </p>
+  </div>
+  <a
+    href="{% url 'create_session' %}"
+    class="rounded-xl bg-blue-800 px-4 py-2 text-sm font-bold text-white shadow hover:bg-blue-900"
+    >+ Tạo phiên thi</a
+  >
+</div>
+<div class="mb-6 grid gap-4 md:grid-cols-5">
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="text-sm text-slate-500">Phiên thi</div>
+    <div class="mt-2 text-3xl font-black">{{ stats.sessions }}</div>
+  </div>
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="text-sm text-slate-500">Đang làm</div>
+    <div class="mt-2 text-3xl font-black text-blue-700">
+      {{ stats.running }}
+    </div>
+  </div>
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="text-sm text-slate-500">Đã thu</div>
+    <div class="mt-2 text-3xl font-black text-amber-600">
+      {{ stats.collected }}
+    </div>
+  </div>
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="text-sm text-slate-500">Hoàn thành</div>
+    <div class="mt-2 text-3xl font-black text-emerald-600">
+      {{ stats.finished }}
+    </div>
+  </div>
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="text-sm text-slate-500">QR chưa gán</div>
+    <div class="mt-2 text-3xl font-black text-slate-900">
+      {{ stats.qr_unused }}
+    </div>
+  </div>
+</div>
+<div class="overflow-hidden rounded-2xl bg-white shadow-soft">
+  <div class="border-b border-slate-200 px-5 py-4">
+    <h2 class="font-black">Danh sách phiên thi</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead
+        class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"
+      >
+        <tr>
+          <th class="px-5 py-3">Phiên</th>
+          <th class="px-5 py-3">Môn</th>
+          <th class="px-5 py-3">Lớp</th>
+          <th class="px-5 py-3">Ngày</th>
+          <th class="px-5 py-3">Phòng</th>
+          <th class="px-5 py-3">Trạng thái</th>
+          <th class="px-5 py-3 text-right">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for s in sessions %}
+        <tr class="hover:bg-blue-50/40">
+          <td class="px-5 py-4 font-bold">{{ s.ma_phien_thi }}</td>
+          <td class="px-5 py-4">{{ s.mon.ten_mon }}</td>
+          <td class="px-5 py-4">{{ s.lop.ten_lop }}</td>
+          <td class="px-5 py-4">{{ s.ngay_thi|date:'d/m/Y' }}</td>
+          <td class="px-5 py-4">{{ s.phong_thi }}</td>
+          <td class="px-5 py-4">
+            <span
+              class="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700"
+              >{{ s.get_trang_thai_display }}</span
+            >
+          </td>
+          <td class="px-5 py-4 text-right">
+            <a
+              class="rounded-lg bg-blue-800 px-3 py-2 font-bold text-white hover:bg-blue-900"
+              href="{% url 'assign_scan' s.id %}"
+              >Gán QR</a
+            >
+            <a
+              class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-bold text-blue-800 hover:bg-blue-100"
+              href="{% url 'session_logs' s.id %}"
+            >
+              Log
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="px-5 py-10 text-center text-slate-500">
+            Chưa có phiên thi.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

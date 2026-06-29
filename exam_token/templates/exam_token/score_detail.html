@@ -1,0 +1,51 @@
+{% extends 'exam_token/base.html' %}
+{% block title %}Phiếu chấm điểm{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-2xl font-black uppercase">Phiếu chấm điểm chi tiết</h1>
+</div>
+<form method="post" class="grid gap-5 xl:grid-cols-[1fr_370px]">
+  {% csrf_token %}
+  <section class="rounded-2xl bg-white shadow-soft">
+    <div class="m-5 rounded-xl border border-slate-200 bg-white p-5">
+      <h2 class="mb-3 font-black uppercase">Thông tin chung</h2>
+      <div class="grid gap-4 text-sm md:grid-cols-2">
+        <div><b>Tên sinh viên:</b> {{ scan.hoc_vien.ho_ten|default:'-' }} {% if scan.hoc_vien %}(MSSV: {{ scan.hoc_vien.ma_hoc_vien }}){% endif %}</div>
+        <div><b>Môn:</b> {{ scan.phien_thi.mon.ten_mon|default:'-' }}</div>
+        <div><b>Lớp:</b> {{ scan.phien_thi.lop.ten_lop|default:'-' }}</div>
+        <div><b>Cán bộ chấm:</b> {{ current_can_bo.ten_can_bo|default:request.user.username }}</div>
+        <div><b>Kỳ thi:</b> {{ scan.phien_thi.ten_ky_thi|default:'-' }}</div>
+        <div><b>Ngày thi:</b> {{ scan.phien_thi.ngay_thi|date:'d/m/Y' }}</div>
+      </div>
+    </div>
+    <div class="mx-5 mb-5 overflow-hidden rounded-xl border border-slate-200">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th class="w-14 px-4 py-3">STT</th><th class="px-4 py-3">Nội dung câu hỏi</th><th class="px-4 py-3">Bài làm sinh viên</th><th class="w-24 px-4 py-3">Điểm tối đa</th><th class="w-28 px-4 py-3">Điểm đạt</th><th class="px-4 py-3">Ghi chú</th></tr></thead>
+        <tbody class="divide-y">
+          {% for d in details %}
+          <tr>
+            <td class="px-4 py-4 text-center font-bold">{{ d.cau_so }}</td>
+            <td class="px-4 py-4"><div class="font-semibold">{{ d.noi_dung }}</div><div class="text-xs text-slate-500">({{ d.diem_toi_da }} đ)</div></td>
+            <td class="px-4 py-4"><button type="button" class="flex items-center gap-3 rounded-xl bg-blue-50 px-3 py-2 text-blue-800"><span>📄</span><span class="h-9 w-20 rounded bg-white text-xs text-slate-400">ảnh bài làm</span><span>⌄</span></button></td>
+            <td class="px-4 py-4 text-center font-bold">{{ d.diem_toi_da }}</td>
+            <td class="px-4 py-4"><input name="diem_{{ d.id }}" value="{{ d.diem_dat }}" type="number" step="0.01" min="0" max="{{ d.diem_toi_da }}" class="scoreInput w-24 rounded-lg border border-slate-300 px-3 py-2 font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></td>
+            <td class="px-4 py-4"><textarea name="ghi_chu_{{ d.id }}" rows="2" placeholder="Ghi chú" class="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">{{ d.ghi_chu }}</textarea></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <aside class="rounded-2xl bg-white p-5 shadow-soft xl:self-start">
+    <h2 class="font-black uppercase">Tổng kết</h2>
+    <div class="mt-4 rounded-xl bg-slate-50 p-4 text-sm"><b>Tổng điểm:</b> <span id="totalScore" class="text-xl font-black text-blue-800">{{ scan.diem_chot|default:'0.00' }}</span> / 10.00 <span class="text-slate-500">(tự động tính)</span></div>
+    <label class="mt-4 block text-sm font-bold">Nhận xét chung
+      <textarea name="nhan_xet" rows="5" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">{{ scan.nhan_xet }}</textarea>
+    </label>
+    <div class="mt-5 flex gap-2"><button name="action" value="draft" class="rounded-xl border border-blue-300 px-4 py-3 font-bold text-blue-800 hover:bg-blue-50">Lưu nháp</button><button name="action" value="confirm" class="flex-1 rounded-xl bg-blue-800 px-4 py-3 font-black text-white hover:bg-blue-900">Xác nhận chấm điểm</button><a href="{% url 'score_list' %}" class="rounded-xl border border-red-300 px-4 py-3 font-bold text-red-600">Hủy</a></div>
+  </aside>
+</form>
+<script>
+(function(){ const inputs=document.querySelectorAll('.scoreInput'), total=document.getElementById('totalScore'); function calc(){let s=0; inputs.forEach(i=>s+=parseFloat(i.value||'0')); total.textContent=s.toFixed(2)} inputs.forEach(i=>i.addEventListener('input',calc)); calc(); })();
+</script>
+{% endblock %}

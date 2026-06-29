@@ -1,0 +1,93 @@
+{% load role_extras %}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { boxShadow: { soft: '0 8px 24px rgba(15, 23, 42, 0.08)' } } } };
+  </script>
+  <title>{% block title %}Hệ thống chấm điểm trực tuyến{% endblock %}</title>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900 antialiased">
+  <header class="fixed inset-x-0 top-0 z-40 h-[70px] bg-blue-800 text-white shadow-md">
+    <div class="flex h-full items-center justify-between px-5">
+      <div class="flex items-center gap-4">
+        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden">
+          <img src="/media/logo.png" alt="Logo Đại học Cảnh sát" class="h-full w-full object-contain">
+        </div>
+        <div>
+          <div class="text-xl font-black uppercase tracking-wide">Hệ thống chấm điểm trực tuyến</div>
+          <div class="text-xs text-blue-100">Quản lý phiên thi · QR bài thi · Chấm điểm</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-5">
+        <div class="hidden text-right md:block">
+          <div class="text-xs uppercase text-blue-100">Cán bộ đăng nhập</div>
+          <div class="font-bold">{% if current_can_bo %}{{ current_can_bo.ten_can_bo }}{% else %}{{ request.user.username }}{% endif %}</div>
+        </div>
+        <div class="h-11 w-11 overflow-hidden rounded-full border-2 border-white/60 bg-blue-100 text-center text-blue-800">
+          <div class="pt-2 text-lg">👤</div>
+        </div>
+        <a href="{% url 'logout' %}" class="rounded-full border border-white/20 px-3 py-2 text-sm font-bold hover:bg-white/10">Đăng xuất</a>
+      </div>
+    </div>
+  </header>
+
+  <aside class="fixed bottom-0 left-0 top-[70px] z-30 hidden w-[245px] border-r border-slate-200 bg-white shadow-sm lg:block">
+    <nav class="space-y-1 p-4 text-sm font-semibold">
+      <a href="{% url 'dashboard' %}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-blue-800">🏠 <span>Dashboard</span></a>
+      <a href="{% url 'import_students' %}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-blue-800">👥 <span>Quản lý lớp</span></a>
+      <a href="{% url 'create_session' %}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-blue-800">🗂️ <span>Tạo phiên thi</span></a>
+      <a href="{% url 'qr_batches' %}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-blue-800">▣ <span>Quản lý QR</span></a>
+      <!-- <a href="{% url 'score_list' %}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-blue-800">📄 <span>Bài thi</span></a> -->
+       <div class="mt-4 border-t border-blue-700/40 pt-4">
+        <div class="mb-2 px-3 text-xs font-black uppercase tracking-wider text-blue-700">
+          Chấm thi
+        </div>
+
+        {% if request.user|has_any_group:'admin,quan_ly_thi,giam_khao_1' %}
+        <a href="{% url 'cham_diem_gk1' %}"
+          class="mb-1 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-blue-500 hover:bg-white/10">
+          <span>📝</span>
+          <span>Chấm điểm GK1</span>
+        </a>
+        {% endif %}
+
+        {% if request.user|has_any_group:'admin,quan_ly_thi,giam_khao_2' %}
+        <a href="{% url 'cham_diem_gk2' %}"
+          class="mb-1 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-blue-500 hover:bg-white/10">
+          <span>✅</span>
+          <span>Chấm điểm GK2 / Đối chiếu</span>
+        </a>
+        {% endif %}       
+
+        {% if request.user|has_any_group:'admin,quan_ly_thi,truong_hoi_dong,can_bo_cham_diem' %}
+        <a href="{% url 'bang_diem_lop' %}"
+          class="mb-1 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold text-blue-500 hover:bg-white/10">
+          <span>📊</span>
+          <span>Bảng điểm lớp</span>
+        </a>
+        {% endif %}
+      </div>
+      <a href="{% url 'logs' %}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-blue-800">↺ <span>Lịch sử</span></a>
+      <a href="{% url 'manage_users' %}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-slate-700 hover:bg-blue-50 hover:text-blue-800">⚙ <span>Người dùng</span></a>
+    </nav>
+  </aside>
+
+  <main class="pt-[70px] lg:pl-[245px]">
+    <div class="px-4 py-6 lg:px-6">
+      {% if messages %}
+        <div class="mb-4 space-y-2">
+          {% for m in messages %}
+          <div class="rounded-xl border px-4 py-3 text-sm font-medium shadow-sm {% if m.tags == 'error' %}border-red-200 bg-red-50 text-red-700{% else %}border-blue-200 bg-blue-50 text-blue-800{% endif %}">{{ m }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</body>
+</html>
+

@@ -19,6 +19,7 @@ from .constants import (
     SESSION_FINISHED,
     SESSION_OPEN,
     SESSION_RUNNING,
+    LATE_ASSIGN_GRACE_MINUTES,
 )
 from .models import ExamSessionLog, GanTokenBaiThi, HocVien, PhienThi, QRBatch, QRTokenBaiThi
 
@@ -117,18 +118,48 @@ def auto_collect_if_expired(request, phien_thi):
 
 
 @transaction.atomic
-def start_exam_timer(request, phien_thi):
-    pt = PhienThi.objects.select_for_update().get(pk=phien_thi.pk)
-    if pt.trang_thai in [SESSION_COLLECTED, SESSION_FINISHED]:
-        raise ValueError('Phiên thi đã thu/hoàn thành, không thể tính giờ.')
+def start_exam_timer(request, pt):
+    """
+    Chỉ bắt đầu tính giờ.
+    Không khóa gán QR ngay.
+    Việc khóa gán thí sinh mới được xử lý ở views.py sau 15 phút.
+    """
     if pt.started_at:
         return pt
+
     now = timezone.now()
+
     pt.started_at = now
-    pt.ended_at = now + timedelta(minutes=int(pt.thoi_gian_lam_bai))
+
+    minutes = int(getattr(pt, "thoi_gian_lam_bai", 0) or 0)
+    if minutes > 0:
+        pt.ended_at = now + timedelta(minutes=minutes)
+
     pt.trang_thai = SESSION_RUNNING
-    pt.save(update_fields=['started_at', 'ended_at', 'trang_thai'])
-    log_action(request, 'start_timer', pt, 'phien_thi', pt.pk, 'Tính giờ làm bài', new_data={'started_at': str(pt.started_at), 'ended_at': str(pt.ended_at)})
+
+    update_fields = ["started_at", "ended_at", "trang_thai"]
+    if hasattr(pt, "updated_at"):
+        update_fields.append("updated_at")
+
+    pt.save(update_fields=update_fields)
+
+    try:
+        log_action(
+            request,
+            "start_timer",
+            pt,
+            "phien_thi",
+            pt.pk,
+            "Bắt đầu tính giờ làm bài. Cho phép gán thí sinh đi trễ trong 15 phút đầu.",
+            new_data={
+                "started_at": str(pt.started_at),
+                "ended_at": str(pt.ended_at),
+                "late_assign_grace_minutes": 15,
+            },
+        )
+    except Exception:
+        pass
+
     return pt
 
 
@@ -150,33 +181,71 @@ def collect_papers(request, phien_thi, auto=False):
 
 
 def student_has_previous_sheet(phien_thi, hoc_vien):
-    return GanTokenBaiThi.objects.filter(phien_thi=phien_thi, hoc_vien=hoc_vien).exists()
+    return GanTokenBaiThi.objects.filter(
+        phien_thi=phien_thi,
+        hoc_vien=hoc_vien,
+    ).exclude(
+        trang_thai__in=["huy", "da_huy", "cancelled"]
+    ).exists()
 
+def is_late_assignment_locked(phien_thi):
+    """
+    Sau khi bắt đầu thi, vẫn cho phép gán QR cho thí sinh đi trễ
+    trong 15 phút đầu. Quá 15 phút thì khóa gán thí sinh mới.
+    """
+    if not phien_thi.started_at:
+        return False
+
+    lock_at = phien_thi.started_at + timedelta(minutes=LATE_ASSIGN_GRACE_MINUTES)
+
+    return timezone.now() >= lock_at
 
 @transaction.atomic
 def assign_qr_to_student(request, phien_thi, token_text, so_bao_danh):
     pt = PhienThi.objects.select_for_update().get(pk=phien_thi.pk)
+
     auto_collect_if_expired(request, pt)
     pt.refresh_from_db()
-    if pt.trang_thai in [SESSION_COLLECTED, SESSION_FINISHED]:
+
+    if pt.trang_thai in [SESSION_COLLECTED, SESSION_FINISHED, "da_thu", "hoan_thanh"]:
         raise ValueError('Phiên thi đã thu/hoàn thành. Chỉ được hủy bài hoặc in biên bản.')
+
     token_text = (token_text or '').strip()
     so_bao_danh = str(so_bao_danh or '').strip()
+
     if not token_text or not so_bao_danh:
         raise ValueError('Vui lòng quét QR và nhập số báo danh.')
+
     try:
         token = QRTokenBaiThi.objects.select_for_update().get(token=token_text)
     except QRTokenBaiThi.DoesNotExist:
         raise ValueError('QR không tồn tại trong DB.')
+
     if token.trang_thai != QR_UNUSED:
         raise ValueError(f'QR không hợp lệ để gán. Trạng thái hiện tại: {token.get_trang_thai_display()}')
+
     try:
         hoc_vien = HocVien.objects.get(lop=pt.lop, so_bao_danh=int(so_bao_danh))
     except (HocVien.DoesNotExist, ValueError):
         raise ValueError('Không tìm thấy thí sinh theo SBD trong lớp của phiên thi.')
-    if pt.started_at and not student_has_previous_sheet(pt, hoc_vien):
-        raise ValueError('Đã tính giờ làm bài. Thí sinh chưa được phát bài trước đó không được gán QR mới.')
-    max_to = GanTokenBaiThi.objects.filter(phien_thi=pt, hoc_vien=hoc_vien).aggregate(m=Max('so_to'))['m'] or 0
+
+    if (
+        pt.started_at
+        and is_late_assignment_locked(pt)
+        and not student_has_previous_sheet(pt, hoc_vien)
+    ):
+        raise ValueError(
+            f'Đã quá {LATE_ASSIGN_GRACE_MINUTES} phút sau khi bắt đầu thi. '
+            'Thí sinh chưa được phát bài trước đó không được gán QR mới.'
+        )
+
+    max_to = (
+        GanTokenBaiThi.objects
+        .filter(phien_thi=pt, hoc_vien=hoc_vien)
+        .aggregate(m=Max('so_to'))['m']
+        or 0
+    )
+
     assignment = GanTokenBaiThi.objects.create(
         token=token,
         phien_thi=pt,
@@ -184,11 +253,30 @@ def assign_qr_to_student(request, phien_thi, token_text, so_bao_danh):
         so_to=max_to + 1,
         trang_thai=ASSIGN_ASSIGNED,
     )
+
     now = timezone.now()
+
     token.trang_thai = QR_ASSIGNED
     token.assigned_at = now
     token.save(update_fields=['trang_thai', 'assigned_at'])
-    log_action(request, 'assign_qr', pt, 'gan_token_bai_thi', assignment.pk, f'Gán QR {token.token} cho {hoc_vien.ho_ten}', new_data={'token': token.token, 'ma_hoc_vien': hoc_vien.ma_hoc_vien, 'sbd': hoc_vien.so_bao_danh, 'so_to': assignment.so_to})
+
+    log_action(
+        request,
+        'assign_qr',
+        pt,
+        'gan_token_bai_thi',
+        assignment.pk,
+        f'Gán QR {token.token} cho {hoc_vien.ho_ten}',
+        new_data={
+            'token': token.token,
+            'ma_hoc_vien': hoc_vien.ma_hoc_vien,
+            'sbd': hoc_vien.so_bao_danh,
+            'so_to': assignment.so_to,
+            'started_at': str(pt.started_at) if pt.started_at else None,
+            'late_assign_grace_minutes': LATE_ASSIGN_GRACE_MINUTES,
+        }
+    )
+
     return assignment
 
 

@@ -1,10 +1,10 @@
-{% load role_extras %}
+{% load static role_extras %}
 <!doctype html>
 <html lang="vi">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{% static 'exam_token/css/tailwind.css' %}">
   <script>
     tailwind.config = { theme: { extend: { boxShadow: { soft: '0 8px 24px rgba(15, 23, 42, 0.08)' } } } };
   </script>

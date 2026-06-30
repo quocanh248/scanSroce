@@ -22,7 +22,7 @@ from django.utils.dateparse import parse_date
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from .qr_tracking import format_print_date_prefix
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.db import transaction
 from .models import ChamDiemBaiThi, PhieuCham, PhieuChamChiTiet, DoiChieuChamDiem, GanTokenBaiThi
 from .scoring_utils import parse_smart_score
@@ -38,6 +38,7 @@ from .constants import (
     SESSION_COLLECTED,
     SESSION_FINISHED,
     SESSION_RUNNING,
+    LATE_ASSIGN_GRACE_MINUTES,
 )
 from .forms import PhienThiForm, StaffUserForm
 from .models import (
@@ -322,37 +323,116 @@ def create_session(request):
         form = PhienThiForm(initial=initial)
     return render(request, 'exam_token/create_session.html', {'form': form, 'exam_minutes': EXAM_MINUTE_CHOICES})
 
+def get_assign_lock_at(pt):
+    """
+    Thời điểm khóa gán thí sinh mới.
+    Chỉ tính sau khi đã bấm bắt đầu thi / tính giờ.
+    """
+    if not pt.started_at:
+        return None
+
+    return pt.started_at + timedelta(minutes=LATE_ASSIGN_GRACE_MINUTES)
+
+
+def is_new_assignment_locked(pt):
+    """
+    Khóa gán thí sinh mới nếu:
+    - đã thu bài
+    - đã hoàn thành
+    - hoặc đã quá 15 phút sau started_at
+    """
+    if pt.finished_at:
+        return True
+
+    if pt.collected_at:
+        return True
+
+    if pt.trang_thai in [SESSION_COLLECTED, SESSION_FINISHED, "da_thu", "hoan_thanh"]:
+        return True
+
+    lock_at = get_assign_lock_at(pt)
+
+    if not lock_at:
+        return False
+
+    return timezone.now() >= lock_at
+
+
+def assign_grace_seconds_left(pt):
+    lock_at = get_assign_lock_at(pt)
+
+    if not lock_at:
+        return None
+
+    return max(0, int((lock_at - timezone.now()).total_seconds()))
 
 @can_manage_exam
 def assign_scan(request, pk):
     pt = get_object_or_404(PhienThi.objects.select_related('lop', 'mon'), pk=pk)
-    is_finished = pt.trang_thai == "hoan_thanh" or pt.finished_at is not None
+
     auto_collect_if_expired(request, pt)
     pt.refresh_from_db()
+
+    is_finished = pt.trang_thai == SESSION_FINISHED or pt.trang_thai == "hoan_thanh" or pt.finished_at is not None
+    is_collected = pt.trang_thai == SESSION_COLLECTED or pt.trang_thai == "da_thu" or pt.collected_at is not None
+
+    assign_lock_at = get_assign_lock_at(pt)
+    assign_locked = is_new_assignment_locked(pt)
+    assign_seconds_left = assign_grace_seconds_left(pt)
+
     if request.method == 'POST':
         action = request.POST.get('action')
+
         if is_finished:
             messages.error(request, "Phiên thi đã hoàn thành. Chỉ được phép in biên bản.")
             return redirect("assign_scan", pk=pt.id)
+
         try:
             if action == 'assign':
-                assignment = assign_qr_to_student(request, pt, request.POST.get('token'), request.POST.get('so_bao_danh'))
-                messages.success(request, f'Đã gán QR cho {assignment.hoc_vien.ho_ten} - tờ {assignment.so_to}.')
+                assignment = assign_qr_to_student(
+                    request,
+                    pt,
+                    request.POST.get('token'),
+                    request.POST.get('so_bao_danh')
+                )
+                messages.success(
+                    request,
+                    f'Đã gán QR cho {assignment.hoc_vien.ho_ten} - tờ {assignment.so_to}.'
+                )
+
             elif action == 'lock_time':
                 from .services import start_exam_timer
                 start_exam_timer(request, pt)
-                messages.success(request, 'Đã tính giờ làm bài và khóa phát bài cho thí sinh chưa nhận bài.')
+
+                messages.success(
+                    request,
+                    f'Đã bắt đầu tính giờ làm bài. '
+                    f'Thí sinh đi trễ vẫn được gán bài trong {LATE_ASSIGN_GRACE_MINUTES} phút đầu.'
+                )
+
             elif action == 'collect_papers':
                 collect_papers(request, pt)
                 messages.success(request, 'Đã thu bài và khóa ô gán dữ liệu.')
+
             elif action == 'cancel_by_token':
-                assignment = cancel_assignment_by_token(request, pt, request.POST.get('cancel_token'), request.POST.get('cancel_reason', ''))
+                assignment = cancel_assignment_by_token(
+                    request,
+                    pt,
+                    request.POST.get('cancel_token'),
+                    request.POST.get('cancel_reason', '')
+                )
                 messages.success(request, f'Đã hủy bài của {assignment.hoc_vien.ho_ten}.')
+
             elif action == 'edit_sbd':
-                edit_assignment_sbd(request, request.POST.get('assignment_id'), request.POST.get('edit_token'), request.POST.get('edit_so_bao_danh'))
+                edit_assignment_sbd(
+                    request,
+                    request.POST.get('assignment_id'),
+                    request.POST.get('edit_token'),
+                    request.POST.get('edit_so_bao_danh')
+                )
                 messages.success(request, 'Đã sửa SBD.')
-            if action == "finish_session":
-                # Nếu chưa thu bài thì tự thu bài trước
+
+            elif action == "finish_session":
                 if pt.trang_thai != "da_thu":
                     GanTokenBaiThi.objects.filter(
                         phien_thi=pt,
@@ -388,12 +468,15 @@ def assign_scan(request, pk):
                 messages.success(request, "Đã hoàn thành việc coi thi. Phiên thi đã bị khóa.")
                 logout(request)
                 return redirect("login")
+
         except Exception as exc:
             messages.error(request, str(exc))
+
         return redirect('assign_scan', pk=pt.pk)
 
     grouped_rows = grouped_assignments(pt)
     totals = session_totals(pt)
+
     cancel_payload = [
         {
             'token': a.token.token,
@@ -403,23 +486,43 @@ def assign_scan(request, pk):
             'so_to': a.so_to,
             'trang_thai': a.trang_thai,
         }
-        for a in GanTokenBaiThi.objects.filter(phien_thi=pt).exclude(trang_thai=ASSIGN_CANCELED).select_related('hoc_vien', 'token').order_by('hoc_vien__so_bao_danh')
+        for a in GanTokenBaiThi.objects
+        .filter(phien_thi=pt)
+        .exclude(trang_thai=ASSIGN_CANCELED)
+        .select_related('hoc_vien', 'token')
+        .order_by('hoc_vien__so_bao_danh')
     ]
+
     seconds_left = 0
     if pt.ended_at and pt.trang_thai == SESSION_RUNNING:
         seconds_left = max(0, int((pt.ended_at - timezone.now()).total_seconds()))
-    ghep_url = reverse('create_session') + f'?ngay_thi={pt.ngay_thi:%Y-%m-%d}&phong_thi={pt.phong_thi}&can_bo_coi_thi_1={pt.can_bo_coi_thi_1}&can_bo_coi_thi_2={pt.can_bo_coi_thi_2}'
-    
+
+    ghep_url = reverse('create_session') + (
+        f'?ngay_thi={pt.ngay_thi:%Y-%m-%d}'
+        f'&phong_thi={pt.phong_thi}'
+        f'&can_bo_coi_thi_1={pt.can_bo_coi_thi_1}'
+        f'&can_bo_coi_thi_2={pt.can_bo_coi_thi_2}'
+    )
+
     return render(request, 'exam_token/assign_scan.html', {
-        'pt': pt,       
+        'pt': pt,
         'grouped_rows': grouped_rows,
         'collect_rows': grouped_rows,
         'total_assigned_students': totals['total_students'],
         'total_active_sheets': totals['total_sheets'],
         'cancel_payload': cancel_payload,
-        'is_finished': pt.trang_thai == SESSION_FINISHED,
-        'is_collected': pt.trang_thai == SESSION_COLLECTED,
-        'is_time_locked': bool(pt.started_at),
+
+        'is_finished': is_finished,
+        'is_collected': is_collected,
+
+        # Giữ tên cũ để template ít phải sửa.
+        # Nhưng ý nghĩa mới: chỉ khóa sau 15 phút, không khóa ngay khi bắt đầu thi.
+        'is_time_locked': assign_locked,
+        'is_assign_locked': assign_locked,
+        'assign_lock_at': assign_lock_at,
+        'assign_grace_seconds_left': assign_seconds_left,
+        'assign_grace_minutes': LATE_ASSIGN_GRACE_MINUTES,
+
         'seconds_left': seconds_left,
         'ghep_url': ghep_url,
     })
@@ -445,6 +548,81 @@ def _register_pdf_fonts():
         bold_name = 'Helvetica-Bold'
     return font_name, bold_name
 
+def bien_ban_full_class_rows(pt):
+    """
+    Trả về toàn bộ danh sách học viên trong lớp của phiên thi.
+    - Có bài: ghi số tờ.
+    - Không có bài: ghi chú Vắng / Không dự thi.
+    - Có bài bị hủy: ghi chú thêm số tờ đã hủy.
+    """
+    students = (
+        HocVien.objects
+        .filter(lop=pt.lop)
+        .order_by("so_bao_danh", "ho_ten", "ma_hoc_vien")
+    )
+
+    assignments = (
+        GanTokenBaiThi.objects
+        .filter(phien_thi=pt)
+        .select_related("hoc_vien", "token")
+        .order_by("hoc_vien__so_bao_danh", "so_to", "id")
+    )
+
+    by_student = {}
+    for a in assignments:
+        by_student.setdefault(a.hoc_vien_id, []).append(a)
+
+    rows = []
+    total_present_students = 0
+    total_active_sheets = 0
+    total_absent_students = 0
+    total_canceled_sheets = 0
+
+    for hv in students:
+        hv_assignments = by_student.get(hv.pk, [])
+
+        active_assignments = [
+            a for a in hv_assignments
+            if a.trang_thai not in [ASSIGN_CANCELED, "huy", "da_huy", "cancelled"]
+        ]
+
+        canceled_assignments = [
+            a for a in hv_assignments
+            if a.trang_thai in [ASSIGN_CANCELED, "huy", "da_huy", "cancelled"]
+        ]
+
+        tong_so_to = len(active_assignments)
+        ghi_chu_parts = []
+
+        if tong_so_to > 0:
+            total_present_students += 1
+            total_active_sheets += tong_so_to
+        else:
+            total_absent_students += 1
+            ghi_chu_parts.append("Vắng")
+
+        if canceled_assignments:
+            total_canceled_sheets += len(canceled_assignments)
+            ghi_chu_parts.append(f"Hủy {len(canceled_assignments)} tờ")
+
+        rows.append({
+            "ma_hoc_vien": hv.ma_hoc_vien,
+            "sbd": hv.so_bao_danh,
+            "ho_ten": hv.ho_ten,
+            "ngay_sinh": hv.ngay_sinh,
+            "tong_so_to": tong_so_to if tong_so_to > 0 else "",
+            "ghi_chu": "; ".join(ghi_chu_parts),
+        })
+
+    summary = {
+        "total_class_students": len(rows),
+        "total_present_students": total_present_students,
+        "total_absent_students": total_absent_students,
+        "total_active_sheets": total_active_sheets,
+        "total_canceled_sheets": total_canceled_sheets,
+    }
+
+    return rows, summary
 
 @can_manage_exam
 def bien_ban_thi_pdf(request, pk):
@@ -462,8 +640,7 @@ def bien_ban_thi_pdf(request, pk):
         pk=pk
     )
 
-    rows = grouped_assignments(pt)
-    totals = session_totals(pt)
+    rows, totals = bien_ban_full_class_rows(pt)
 
     font, bold = _register_pdf_fonts()
 
@@ -554,7 +731,7 @@ def bien_ban_thi_pdf(request, pk):
                 ngay_sinh,
                 str(r.get("tong_so_to") or ""),
                 "",
-                "",
+                str(r.get("ghi_chu") or ""),
             ]
 
             x = x0
@@ -577,11 +754,12 @@ def bien_ban_thi_pdf(request, pk):
         bottom = start_y - 8 * mm
 
         c.setFont(font, 11)
-        c.drawString(12 * mm, bottom, f'- Tổng số thí sinh: {totals["total_students"]}')
-        c.drawString(12 * mm, bottom - 6 * mm, f'- Tổng số bài: {totals["total_students"]}')
-        c.drawString(12 * mm, bottom - 12 * mm, f'- Tổng số tờ: {totals["total_sheets"]}')
+        c.drawString(12 * mm, bottom, f'- Tổng số thí sinh trong danh sách: {totals["total_class_students"]}')
+        c.drawString(12 * mm, bottom - 6 * mm, f'- Số thí sinh dự thi/có bài: {totals["total_present_students"]}')
+        c.drawString(12 * mm, bottom - 12 * mm, f'- Số thí sinh vắng/không dự thi: {totals["total_absent_students"]}')
+        c.drawString(12 * mm, bottom - 18 * mm, f'- Tổng số tờ bài thi đã thu: {totals["total_active_sheets"]}')
 
-        sig_y = bottom - 28 * mm
+        sig_y = bottom - 34 * mm
 
         # Để 3 ô chữ ký cùng một hàng, tránh bị tụt quá sâu khi danh sách dài
         center_text("CÁN BỘ COI THI 1", 38 * mm, sig_y, 10, True)
@@ -630,12 +808,12 @@ def bien_ban_thi_pdf(request, pk):
     # Nếu trang cuối không đủ chỗ thì tạo thêm trang riêng cho tổng + chữ ký
     if need_extra_signature_page:
         page_no = total_pages
-        draw_page_header(page_no, total_pages)
+        # draw_page_header(page_no, total_pages)
 
         c.setFont(bold, 12)
-        c.drawString(12 * mm, table_y - 5 * mm, "Tổng hợp giao nộp bài thi")
+        c.drawString(12 * mm, table_y + 50 * mm, "Tổng hợp giao nộp bài thi")
 
-        draw_summary_and_signatures(table_y - 15 * mm)
+        draw_summary_and_signatures(table_y + 48 * mm)
 
     c.save()
     buffer.seek(0)

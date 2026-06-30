@@ -59,3 +59,4 @@ STAFF_STATUS_CHOICES = [
 ]
 
 EXAM_MINUTE_CHOICES = [(90, '90 phút'), (120, '120 phút'), (150, '150 phút'), (180, '180 phút')]
+LATE_ASSIGN_GRACE_MINUTES = 15

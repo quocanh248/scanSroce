@@ -1960,3 +1960,5 @@ def bang_diem_lop_pdf(request):
         filename=f"phieu_tong_hop_diem_{safe_name}.pdf",
         content_type="application/pdf"
     )
+
+

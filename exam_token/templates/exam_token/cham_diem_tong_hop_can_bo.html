@@ -1,0 +1,32 @@
+{% extends "exam_token/base.html" %}
+{% load score_workflow_extras %}
+{% block title %}Phiếu tổng hợp {{ role_title }}{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <h1 class="text-2xl font-black text-slate-900">Phiếu tổng hợp {{ role_title }}</h1>
+    <p class="mt-1 text-sm text-slate-500">{{ pt.lop.ten_lop }} · {{ pt.mon.ten_mon }}</p>
+    <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">Cán bộ chấm</div><div class="font-black">{{ config.ten_can_bo_cham|default:"Chưa cấu hình" }}</div></div>
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">Số câu</div><div class="font-black">{{ config.so_cau|default:"-" }}</div></div>
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">Đã chấm</div><div class="font-black">{{ scored }}/{{ required }} thí sinh</div></div>
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">Trạng thái</div><div class="font-black">{% if config.is_locked %}Đã khóa{% elif is_full %}Đã đủ bài{% else %}Đang chấm{% endif %}</div></div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-3">
+      {% if lan_cham == 1 %}<a href="{% url 'cham_diem_gk1' %}?mode=edit" class="rounded-xl border px-4 py-2 font-bold text-slate-700">Sửa điểm nhập</a>{% else %}<a href="{% url 'cham_diem_gk2' %}?mode=edit" class="rounded-xl border px-4 py-2 font-bold text-slate-700">Sửa điểm nhập</a>{% endif %}
+      <a target="_blank" href="{% url 'phieu_cham_can_bo_pdf' lan_cham pt.id %}" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 font-bold text-emerald-700">In phiếu chấm</a>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="finish"><button class="rounded-xl bg-blue-700 px-4 py-2 font-bold text-white" onclick="return confirm('Hoàn thành việc nhập điểm và khóa các phiếu đã nhập?')">Hoàn thành việc nhập điểm</button></form>
+      {% if can_compare %}<a href="{% url 'cham_diem_doi_chieu_phien' pt.id %}" class="rounded-xl bg-purple-700 px-4 py-2 font-bold text-white">Xem danh sách điểm tổng hợp</a>{% endif %}
+    </div>
+    {% if lan_cham == 1 and not is_full %}<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">Có thể kết thúc tạm và in phiếu theo số bài thực tế đã chấm, nhưng CBCT 2 chưa được chấm cho đến khi CBCT 1 chấm đủ.</div>{% endif %}
+  </div>
+  <div class="overflow-x-auto rounded-2xl bg-white shadow-soft">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-100 text-slate-700"><tr><th class="px-3 py-2 text-left">STT</th><th class="px-3 py-2 text-left">ID QR</th>{% for c in cau_range %}<th class="px-3 py-2 text-center">Câu {{ c }}</th>{% endfor %}<th class="px-3 py-2 text-center">Tổng</th><th class="px-3 py-2 text-left">Ghi chú</th></tr></thead>
+      <tbody>
+        {% for row in rows %}<tr class="border-t"><td class="px-3 py-2">{{ forloop.counter }}</td><td class="px-3 py-2">{{ row.token_id }}</td>{% for c in cau_range %}<td class="px-3 py-2 text-center">{{ row.scores|get_item:c }}</td>{% endfor %}<td class="px-3 py-2 text-center font-bold">{{ row.total }}</td><td class="px-3 py-2">{{ row.phieu.ghi_chu|default:"" }}</td></tr>{% empty %}<tr><td colspan="10" class="px-3 py-6 text-center text-slate-500">Chưa có phiếu chấm.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

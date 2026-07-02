@@ -1,0 +1,104 @@
+{% extends "exam_token/base.html" %}
+{% load static %}
+{% block title %}{{ role_title }}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-5xl space-y-5">
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <h1 class="text-2xl font-black text-slate-900">{{ role_title }}</h1>
+    <p class="mt-1 text-sm text-slate-500">Quét QR bài thi để nhập điểm. Một thí sinh có nhiều tờ vẫn chỉ tính là một bài chấm.</p>
+  </div>
+
+  {% if need_confirm_switch %}
+  <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+    <h2 class="text-xl font-black text-amber-800">Bạn đang chuyển sang lớp/môn khác</h2>
+    <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div class="rounded-xl bg-white p-4"><div class="text-sm text-slate-500">Đang chấm</div><div class="font-bold">{{ old_pt.lop.ten_lop|default:"-" }} · {{ old_pt.mon.ten_mon|default:"-" }}</div></div>
+      <div class="rounded-xl bg-white p-4"><div class="text-sm text-slate-500">QR vừa quét</div><div class="font-bold">{{ new_pt.lop.ten_lop }} · {{ new_pt.mon.ten_mon }}</div></div>
+    </div>
+    <div class="mt-4 flex gap-3">
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="confirm_switch"><input type="hidden" name="qr_link" value="{{ qr_link }}"><input type="hidden" name="mode" value="{{ mode }}"><button class="rounded-xl bg-blue-700 px-4 py-2 font-bold text-white">Đồng ý chuyển lớp/môn</button></form>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="cancel_switch"><button class="rounded-xl border px-4 py-2 font-bold text-slate-700">Hủy</button></form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if pending_config %}
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <h2 class="text-xl font-black text-slate-900">Cấu hình phiên chấm</h2>
+    <div class="mt-3 rounded-xl bg-slate-50 p-4 text-sm"><div><b>Lớp:</b> {{ pt.lop.ten_lop }}</div><div><b>Môn:</b> {{ pt.mon.ten_mon }}</div></div>
+    <form method="post" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+      {% csrf_token %}<input type="hidden" name="action" value="save_config_then_scan"><input type="hidden" name="qr_link" value="{{ qr_link }}"><input type="hidden" name="mode" value="{{ mode }}">
+      <div class="md:col-span-2"><label class="mb-1 block text-sm font-semibold">Tên cán bộ chấm thi</label><input name="ten_can_bo_cham" required class="w-full rounded-xl border px-3 py-2" autocomplete="off"></div>
+      <div><label class="mb-1 block text-sm font-semibold">Số câu hỏi</label>{% if fixed_so_cau %}<input type="hidden" name="so_cau" value="{{ fixed_so_cau }}"><div class="rounded-xl border bg-slate-100 px-3 py-2 font-bold">{{ fixed_so_cau }} câu</div><p class="mt-1 text-xs text-slate-500">CBCT 2 dùng số câu đã cấu hình ở CBCT 1.</p>{% else %}<select name="so_cau" class="w-full rounded-xl border px-3 py-2"><option value="2">2 câu</option><option value="3">3 câu</option><option value="4">4 câu</option></select>{% endif %}</div>
+      <div class="md:col-span-3"><button class="rounded-xl bg-blue-700 px-5 py-2 font-bold text-white">Lưu cấu hình và chấm bài này</button></div>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if scoring %}
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="flex flex-col justify-between gap-3 md:flex-row">
+      <div><h2 class="text-xl font-black text-slate-900">Phiếu chấm</h2><p class="text-sm text-slate-500">{{ pt.lop.ten_lop }} · {{ pt.mon.ten_mon }} · Cán bộ chấm: <b>{{ config.ten_can_bo_cham }}</b></p></div>
+      <a href="{% url 'cham_diem_tong_hop_can_bo' lan_cham pt.id %}" class="rounded-xl border px-4 py-2 text-sm font-bold text-slate-700">Xem phiếu tổng hợp</a>
+    </div>
+    {% if mode == "edit" %}<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">Chế độ sửa điểm. Phiếu đã khóa chỉ admin Phòng Khảo thí được sửa.</div>{% endif %}
+    <form method="post" class="mt-5 space-y-3" data-score-form>
+      {% csrf_token %}<input type="hidden" name="action" value="submit_score"><input type="hidden" name="qr_link" value="{{ qr_link }}"><input type="hidden" name="mode" value="{{ mode }}">
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-{{ config.so_cau }}">
+        {% for row in score_rows %}
+        <div class="rounded-xl border p-4">
+          <label class="mb-2 block font-bold">Câu {{ row.cau_so }}</label>
+          <div class="flex items-center gap-3">
+            <input
+              name="diem_{{ row.cau_so }}"
+              value="{{ row.diem }}"
+              class="score-input w-full rounded-xl border px-3 py-2 text-center text-xl font-black"
+              autocomplete="off"
+              inputmode="decimal"
+              placeholder="Điểm"
+            >
+            <div class="min-w-[74px] rounded-xl bg-slate-100 px-3 py-2 text-center text-lg font-black text-blue-800" data-score-preview>0</div>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">Ví dụ nhập 45 → 4.5</p>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="rounded-xl bg-slate-50 p-4"><label class="mb-1 block text-sm font-semibold">Ghi chú</label><textarea name="ghi_chu" rows="2" class="w-full rounded-xl border px-3 py-2">{{ existing_phieu.ghi_chu|default:"" }}</textarea></div>
+      <div class="flex items-center justify-between rounded-xl bg-blue-50 p-4"><div class="text-lg font-black text-blue-900">Tổng điểm: <span data-score-total>0</span></div><div data-score-error class="hidden text-sm font-bold text-red-700"></div><button data-score-submit class="rounded-xl bg-blue-700 px-5 py-2 font-bold text-white disabled:bg-slate-300">Lưu phiếu</button></div>
+    </form>
+  </div>
+
+  {% if lan_cham == 2 and phieu_gk1 %}
+  <div id="gk1Overlay" class="hidden fixed inset-0 z-50 bg-slate-900/40 p-4">
+    <div class="ml-auto max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl bg-white p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h3 class="text-lg font-black">Phiếu CBCT 1</h3><button data-close-overlay class="rounded-lg border px-3 py-1 font-bold">Đóng</button></div>
+      <p class="mt-1 text-sm text-slate-500">Bấm Ctrl + 9 để hiện/ẩn phiếu này.</p>
+      <div class="mt-4 space-y-2">{% for row in phieu_gk1_rows %}<div class="flex justify-between rounded-xl bg-slate-50 p-3"><span class="font-bold">Câu {{ row.cau_so }}</span><span>{{ row.diem }}</span></div>{% endfor %}<div class="flex justify-between rounded-xl bg-blue-50 p-3 font-black text-blue-900"><span>Tổng</span><span>{{ phieu_gk1.tong_diem }}</span></div></div>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% if not pending_config and not scoring and not need_confirm_switch %}
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="scan">
+      <input type="hidden" name="mode" value="{{ mode }}">
+      <div>
+        <label class="mb-1 block text-sm font-semibold">Quét QR bài thi</label>
+        <input name="qr_link" id="qrInput" autofocus class="w-full rounded-xl border px-3 py-3 text-lg" autocomplete="off">
+      </div>
+    <div class="flex gap-3">
+      <a href="{% url 'cham_diem_tong_hop_man_hinh' %}" class="rounded-xl border px-4 py-2 text-sm font-bold text-slate-700">
+        Xem điểm tổng hợp
+      </a>
+      <button class="rounded-xl bg-blue-700 px-5 py-2 font-bold text-white">Quét / Tiếp tục</button>{% if mode == "edit" %}
+      <span class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 font-bold text-amber-800">Chế độ sửa điểm</span>{% endif %}
+    </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+<script src="{% static 'exam_token/js/cham_diem_workflow.js' %}"></script>
+{% endblock %}

@@ -1,5 +1,5 @@
 from django.urls import path
-
+from . import cham_diem_workflow as cdw
 from . import views
 
 urlpatterns = [
@@ -20,10 +20,16 @@ urlpatterns = [
     path('cham-diem/<int:pk>/', views.score_detail, name='score_detail'),
     path('lich-su/', views.logs, name='logs'),
     path('phien-thi/<int:pk>/logs/', views.session_logs, name='session_logs'),
-    path('qr/dot-in/<int:pk>/excel/', views.qr_batch_excel, name='qr_batch_excel'),
-    path('cham-diem/gk1/', views.cham_diem_gk1, name='cham_diem_gk1'),
-    path('cham-diem/gk2/', views.cham_diem_gk2, name='cham_diem_gk2'),
+    path('qr/dot-in/<int:pk>/excel/', views.qr_batch_excel, name='qr_batch_excel'),    
     path('cham-diem/doi-chieu/<int:pk>/', views.cham_diem_doi_chieu, name='cham_diem_doi_chieu'),
     path('cham-diem/thong-nhat/<int:pk>/', views.cham_diem_thong_nhat, name='cham_diem_thong_nhat'),   
     path('cham-diem/bang-diem-lop/', views.bang_diem_lop, name='bang_diem_lop'),
+    path("cham-diem/gk1/", cdw.cham_diem_gk1, name="cham_diem_gk1"),
+    path("cham-diem/gk2/", cdw.cham_diem_gk2, name="cham_diem_gk2"),
+    path("cham-diem/tong-hop/<int:lan_cham>/<int:phien_thi_id>/", cdw.cham_diem_tong_hop_can_bo, name="cham_diem_tong_hop_can_bo"),
+    path("cham-diem/phieu-cham-pdf/<int:lan_cham>/<int:phien_thi_id>/", cdw.phieu_cham_can_bo_pdf, name="phieu_cham_can_bo_pdf"),
+    path("cham-diem/doi-chieu-phien/<int:phien_thi_id>/", cdw.cham_diem_doi_chieu_phien, name="cham_diem_doi_chieu_phien"),
+    path("cham-diem/xu-ly-lech/<int:bai_cham_id>/", cdw.cham_diem_xu_ly_lech, name="cham_diem_xu_ly_lech"),
+    path("cham-diem/xuat-ban-diem/<int:phien_thi_id>/", cdw.xuat_bang_diem_tong_hop_cuoi, name="xuat_bang_diem_tong_hop_cuoi"),
+    path("cham-diem/tong-hop/", cdw.cham_diem_tong_hop_man_hinh, name="cham_diem_tong_hop_man_hinh"),
 ]

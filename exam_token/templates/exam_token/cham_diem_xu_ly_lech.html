@@ -1,0 +1,28 @@
+{% extends "exam_token/base.html" %}
+{% load static score_workflow_extras %}
+{% block title %}Xử lý lệch điểm{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-5xl space-y-5">
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <h1 class="text-2xl font-black text-slate-900">Xử lý lệch điểm</h1>
+    <p class="mt-1 text-sm text-slate-500">{{ bai.phien_thi.lop.ten_lop }} · {{ bai.phien_thi.mon.ten_mon }} · ID QR: {{ bai.token.id }}</p>
+    <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 font-bold text-amber-800">{{ note }}</div>
+  </div>
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div class="rounded-2xl bg-white p-5 shadow-soft"><h2 class="font-black">Phiếu CBCT 1</h2>{% for c in cau_range %}<div class="mt-2 flex justify-between rounded-xl bg-slate-50 p-3"><span>Câu {{ c }}</span><b>{{ scores1|get_item:c }}</b></div>{% endfor %}<div class="mt-2 flex justify-between rounded-xl bg-blue-50 p-3 text-blue-900"><span>Tổng</span><b>{{ phieu1.tong_diem }}</b></div></div>
+    <div class="rounded-2xl bg-white p-5 shadow-soft"><h2 class="font-black">Phiếu CBCT 2</h2>{% for c in cau_range %}<div class="mt-2 flex justify-between rounded-xl bg-slate-50 p-3"><span>Câu {{ c }}</span><b>{{ scores2|get_item:c }}</b></div>{% endfor %}<div class="mt-2 flex justify-between rounded-xl bg-blue-50 p-3 text-blue-900"><span>Tổng</span><b>{{ phieu2.tong_diem }}</b></div></div>
+  </div>
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <h2 class="text-xl font-black">{{ action_label }}</h2>
+    <p class="mt-1 text-sm text-slate-500">Nhập điểm cuối cùng theo từng câu. Tổng điểm không được vượt quá 10.</p>
+    <form method="post" class="mt-4 space-y-4" data-score-form>
+      {% csrf_token %}
+      <div><label class="mb-1 block text-sm font-semibold">Tên người/đơn vị thống nhất hoặc lãnh đạo chấm</label><input name="ten_can_bo_cham" class="w-full rounded-xl border px-3 py-2" autocomplete="off"></div>
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-4">{% for row in score_rows %}<div class="rounded-xl border p-4"><label class="mb-2 block font-bold">Câu {{ row.cau_so }}</label><input name="diem_{{ row.cau_so }}" value="{{ row.diem }}" class="score-input w-full rounded-xl border px-3 py-2 text-center text-xl font-black" autocomplete="off" inputmode="decimal"></div>{% endfor %}</div>
+      <div><label class="mb-1 block text-sm font-semibold">Ghi chú</label><textarea name="ghi_chu" rows="2" class="w-full rounded-xl border px-3 py-2"></textarea></div>
+      <div class="flex items-center justify-between rounded-xl bg-blue-50 p-4"><div class="text-lg font-black text-blue-900">Tổng điểm: <span data-score-total>0</span></div><div data-score-error class="hidden text-sm font-bold text-red-700"></div><button data-score-submit class="rounded-xl bg-blue-700 px-5 py-2 font-bold text-white disabled:bg-slate-300">Lưu xử lý lệch điểm</button></div>
+    </form>
+  </div>
+</div>
+<script src="{% static 'exam_token/js/cham_diem_workflow.js' %}"></script>
+{% endblock %}

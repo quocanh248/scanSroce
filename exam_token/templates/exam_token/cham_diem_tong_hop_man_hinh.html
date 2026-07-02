@@ -1,0 +1,123 @@
+{% extends "exam_token/base.html" %}
+{% load score_workflow_extras %}
+{% block title %}Xem điểm tổng hợp{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+      <div>
+        <h1 class="text-2xl font-black text-slate-900">Xem điểm tổng hợp trên màn hình</h1>
+        <p class="mt-1 text-sm text-slate-500">Chọn phiên thi để xem điểm CBCT 1, CBCT 2, lệch điểm và trạng thái xử lý.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="{% url 'cham_diem_gk1' %}" class="rounded-xl border px-4 py-2 text-sm font-bold text-slate-700">Chấm CBCT 1</a>
+        <a href="{% url 'cham_diem_gk2' %}" class="rounded-xl border px-4 py-2 text-sm font-bold text-slate-700">Chấm CBCT 2</a>
+      </div>
+    </div>
+
+    <form method="get" class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-12">
+      <div class="md:col-span-4">
+        <label class="mb-1 block text-sm font-semibold text-slate-700">Tìm lớp/môn/ID phiên</label>
+        <input name="q" value="{{ q }}" class="w-full rounded-xl border px-3 py-2" placeholder="Ví dụ: K1, Tin học, 12">
+      </div>
+      <div class="md:col-span-6">
+        <label class="mb-1 block text-sm font-semibold text-slate-700">Phiên thi</label>
+        <select name="phien_thi" class="w-full rounded-xl border px-3 py-2">
+          <option value="">-- Chọn phiên thi --</option>
+          {% for pt in phien_list %}
+            <option value="{{ pt.id }}" {% if selected_pt and selected_pt.id == pt.id %}selected{% endif %}>
+              #{{ pt.id }} · {{ pt.lop.ten_lop|default:"-" }} · {{ pt.mon.ten_mon|default:"-" }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex items-end md:col-span-2">
+        <button class="w-full rounded-xl bg-blue-700 px-4 py-2 font-bold text-white">Xem</button>
+      </div>
+    </form>
+  </div>
+
+  {% if selected_pt %}
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <div class="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+      <div>
+        <h2 class="text-xl font-black text-slate-900">{{ selected_pt.lop.ten_lop|default:"-" }} · {{ selected_pt.mon.ten_mon|default:"-" }}</h2>
+        <p class="mt-1 text-sm text-slate-500">Phiên thi #{{ selected_pt.id }} · Số câu: <b>{{ so_cau }}</b></p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {% if cfg1 %}
+        <a href="{% url 'cham_diem_tong_hop_can_bo' 1 selected_pt.id %}" class="rounded-xl border px-4 py-2 text-sm font-bold text-slate-700">Phiếu CBCT 1</a>
+        {% endif %}
+        {% if cfg2 %}
+        <a href="{% url 'cham_diem_tong_hop_can_bo' 2 selected_pt.id %}" class="rounded-xl border px-4 py-2 text-sm font-bold text-slate-700">Phiếu CBCT 2</a>
+        {% endif %}
+        {% if can_open_compare %}
+        <a href="{% url 'cham_diem_doi_chieu_phien' selected_pt.id %}" class="rounded-xl bg-purple-700 px-4 py-2 text-sm font-bold text-white">Đối chiếu toàn phiên</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">Số thí sinh cần chấm</div><div class="text-xl font-black">{{ required }}</div></div>
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">CBCT 1</div><div class="text-xl font-black">{{ scored1 }}/{{ required }}</div><div class="mt-1 text-xs text-slate-500">{{ cfg1.ten_can_bo_cham|default:"Chưa cấu hình" }}</div></div>
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">CBCT 2</div><div class="text-xl font-black">{{ scored2 }}/{{ required }}</div><div class="mt-1 text-xs text-slate-500">{{ cfg2.ten_can_bo_cham|default:"Chưa cấu hình" }}</div></div>
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">Có thể đối chiếu</div><div class="text-xl font-black">{% if can_open_compare %}Có{% else %}Chưa{% endif %}</div></div>
+      <div class="rounded-xl bg-slate-50 p-4"><div class="text-sm text-slate-500">Tổng dòng</div><div class="text-xl font-black">{{ rows|length }}</div></div>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto rounded-2xl bg-white shadow-soft">
+    <table class="min-w-full text-xs">
+      <thead class="bg-slate-100 text-slate-700">
+        <tr>
+          <th class="px-3 py-2 text-left">STT</th>
+          <th class="px-3 py-2 text-left">ID qr_token bài thi</th>
+          {% for c in cau_range %}<th class="px-3 py-2 text-center">CBCT1 C{{ c }}</th>{% endfor %}
+          <th class="px-3 py-2 text-center">Tổng 1</th>
+          {% for c in cau_range %}<th class="px-3 py-2 text-center">CBCT2 C{{ c }}</th>{% endfor %}
+          <th class="px-3 py-2 text-center">Tổng 2</th>
+          {% for c in cau_range %}<th class="px-3 py-2 text-center">Lệch C{{ c }}</th>{% endfor %}
+          <th class="px-3 py-2 text-center">Lệch tổng</th>
+          <th class="px-3 py-2 text-center">Điểm xử lý</th>
+          <th class="px-3 py-2 text-center">Điểm cuối</th>
+          <th class="px-3 py-2 text-left">Hình thức</th>
+          <th class="px-3 py-2 text-left">Ghi chú</th>
+          <th class="px-3 py-2 text-left">Trạng thái</th>
+          <th class="px-3 py-2 text-left">Xử lý</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="border-t align-top {% if row.need_processing %}bg-amber-50{% elif row.doi_chieu_done %}bg-emerald-50{% endif %}">
+          <td class="px-3 py-2">{{ forloop.counter }}</td>
+          <td class="px-3 py-2 font-semibold">{{ row.token_ids }}</td>
+          {% for c in cau_range %}<td class="px-3 py-2 text-center">{{ row.scores1|get_item:c }}</td>{% endfor %}
+          <td class="px-3 py-2 text-center font-bold">{{ row.phieu1.tong_diem|default:"" }}</td>
+          {% for c in cau_range %}<td class="px-3 py-2 text-center">{{ row.scores2|get_item:c }}</td>{% endfor %}
+          <td class="px-3 py-2 text-center font-bold">{{ row.phieu2.tong_diem|default:"" }}</td>
+          {% for c in cau_range %}<td class="px-3 py-2 text-center">{{ row.diffs|get_item:c }}</td>{% endfor %}
+          <td class="px-3 py-2 text-center font-bold">{{ row.total_diff }}</td>
+          <td class="px-3 py-2 text-center">{{ row.phieu3.tong_diem|default:"" }}</td>
+          <td class="px-3 py-2 text-center font-black">{{ row.final_score }}</td>
+          <td class="px-3 py-2">{{ row.action_label }}</td>
+          <td class="px-3 py-2">{{ row.note }}</td>
+          <td class="px-3 py-2 font-bold">{{ row.status }}</td>
+          <td class="px-3 py-2">
+            {% if row.need_processing and row.bai %}
+              <a href="{% url 'cham_diem_xu_ly_lech' row.bai.id %}" class="rounded-lg bg-amber-600 px-3 py-1 font-bold text-white">Xử lý</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="30" class="px-3 py-8 text-center text-slate-500">Chưa có bài đã thu hoặc chưa có dữ liệu chấm.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="rounded-2xl bg-white p-8 text-center text-slate-500 shadow-soft">
+    Chọn một phiên thi ở phía trên để xem điểm tổng hợp.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

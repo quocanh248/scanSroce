@@ -293,6 +293,12 @@ class ChamDiemBaiThi(models.Model):
     ghi_chu = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    max_do_lech = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    hinh_thuc_xu_ly = models.CharField(max_length=50, blank=True)
+    ghi_chu_doi_chieu = models.TextField(blank=True)
+    diem_xu_ly = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    doi_chieu_done = models.BooleanField(default=False)
+    published_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "cham_diem_bai_thi"
@@ -330,6 +336,10 @@ class PhieuCham(models.Model):
     ghi_chu = models.TextField(blank=True, null=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    ten_can_bo_cham = models.CharField(max_length=255, blank=True)
+    so_cau = models.PositiveSmallIntegerField(default=2)
+    is_locked = models.BooleanField(default=False)
+    locked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "phieu_cham"
@@ -400,3 +410,23 @@ class DoiChieuChamDiem(models.Model):
     class Meta:
         db_table = "doi_chieu_cham_diem"
         ordering = ["-created_at"]
+
+class CauHinhChamThi(models.Model):
+    phien_thi = models.ForeignKey("PhienThi", on_delete=models.CASCADE, related_name="cau_hinh_cham_thi")
+    lan_cham = models.PositiveSmallIntegerField()  # 1 hoặc 2
+    ten_can_bo_cham = models.CharField(max_length=255)
+    so_cau = models.PositiveSmallIntegerField(default=2)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="cau_hinh_cham_thi_created")
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    is_locked = models.BooleanField(default=False)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "cau_hinh_cham_thi"
+        unique_together = ("phien_thi", "lan_cham")
+
+    def __str__(self):
+        return f"{self.phien_thi_id} - lần {self.lan_cham} - {self.ten_can_bo_cham}"

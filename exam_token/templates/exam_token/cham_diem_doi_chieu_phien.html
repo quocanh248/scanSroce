@@ -1,0 +1,20 @@
+{% extends "exam_token/base.html" %}
+{% load score_workflow_extras %}
+{% block title %}Đối chiếu điểm toàn phiên{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <div class="rounded-2xl bg-white p-5 shadow-soft">
+    <h1 class="text-2xl font-black text-slate-900">Đối chiếu điểm toàn phiên</h1>
+    <p class="mt-1 text-sm text-slate-500">{{ pt.lop.ten_lop }} · {{ pt.mon.ten_mon }}</p>
+    {% if can_publish %}<a href="{% url 'xuat_bang_diem_tong_hop_cuoi' pt.id %}" class="mt-4 inline-block rounded-xl bg-green-700 px-4 py-2 font-bold text-white" onclick="return confirm('Xuất bản điểm tổng hợp cuối cùng?')">Xuất bảng điểm tổng hợp cuối cùng</a>{% else %}<div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">Còn bài/câu lệch điểm chưa xử lý. Sau khi xử lý hết mới được xuất bảng điểm tổng hợp cuối cùng.</div>{% endif %}
+  </div>
+  <div class="overflow-x-auto rounded-2xl bg-white shadow-soft">
+    <table class="min-w-full text-xs">
+      <thead class="bg-slate-100 text-slate-700"><tr><th class="px-2 py-2 text-left">STT</th><th class="px-2 py-2 text-left">ID QR</th>{% for c in cau_range %}<th class="px-2 py-2 text-center">GK1 C{{ c }}</th>{% endfor %}<th class="px-2 py-2 text-center">Tổng GK1</th>{% for c in cau_range %}<th class="px-2 py-2 text-center">GK2 C{{ c }}</th>{% endfor %}<th class="px-2 py-2 text-center">Tổng GK2</th>{% for c in cau_range %}<th class="px-2 py-2 text-center">Lệch C{{ c }}</th>{% endfor %}<th class="px-2 py-2 text-center">Lệch tổng</th><th class="px-2 py-2 text-center">Điểm cuối</th><th class="px-2 py-2 text-left">Hình thức</th><th class="px-2 py-2 text-left">Ghi chú</th><th class="px-2 py-2 text-left">Trạng thái</th></tr></thead>
+      <tbody>
+        {% for row in rows %}<tr class="border-t {% if not row.doi_chieu_done %}bg-amber-50{% endif %}"><td class="px-2 py-2">{{ forloop.counter }}</td><td class="px-2 py-2">{{ row.token_id }}</td>{% for c in cau_range %}<td class="px-2 py-2 text-center">{{ row.scores1|get_item:c }}</td>{% endfor %}<td class="px-2 py-2 text-center font-bold">{{ row.phieu1.tong_diem }}</td>{% for c in cau_range %}<td class="px-2 py-2 text-center">{{ row.scores2|get_item:c }}</td>{% endfor %}<td class="px-2 py-2 text-center font-bold">{{ row.phieu2.tong_diem }}</td>{% for c in cau_range %}<td class="px-2 py-2 text-center">{{ row.diffs|get_item:c }}</td>{% endfor %}<td class="px-2 py-2 text-center font-bold">{{ row.total_diff }}</td><td class="px-2 py-2 text-center font-bold">{{ row.diem_chinh_thuc|default:"" }}</td><td class="px-2 py-2">{{ row.action_label }}</td><td class="px-2 py-2">{{ row.note }}{% if not row.doi_chieu_done and row.action != "tu_dong_lay_gk2" %}<div><a class="font-bold text-blue-700 underline" href="{% url 'cham_diem_xu_ly_lech' row.bai.id %}">Xử lý lệch điểm</a></div>{% endif %}</td><td class="px-2 py-2">{% if row.doi_chieu_done %}<span class="font-bold text-green-700">Đã xử lý</span>{% else %}<span class="font-bold text-red-700">Chưa xử lý</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="30" class="px-3 py-6 text-center text-slate-500">Chưa có dữ liệu đối chiếu.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

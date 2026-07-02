@@ -52,8 +52,7 @@
       <thead
         class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"
       >
-        <tr>
-          <th class="px-5 py-3">Phiên</th>
+        <tr>         
           <th class="px-5 py-3">Môn</th>
           <th class="px-5 py-3">Lớp</th>
           <th class="px-5 py-3">Ngày</th>
@@ -64,8 +63,7 @@
       </thead>
       <tbody class="divide-y divide-slate-100">
         {% for s in sessions %}
-        <tr class="hover:bg-blue-50/40">
-          <td class="px-5 py-4 font-bold">{{ s.ma_phien_thi }}</td>
+        <tr class="hover:bg-blue-50/40">        
           <td class="px-5 py-4">{{ s.mon.ten_mon }}</td>
           <td class="px-5 py-4">{{ s.lop.ten_lop }}</td>
           <td class="px-5 py-4">{{ s.ngay_thi|date:'d/m/Y' }}</td>
